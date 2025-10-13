@@ -565,7 +565,7 @@ function showHelp() {
            <div style="margin-bottom: 20px;">
     <h4 style="color: #3498db; margin-bottom: 10px;">🛠️ Управление календарем</h4>
     <div style="margin-bottom: 8px;">
-        <strong>"Установить вахту"</strong> - задать дату начала рабочего цикла
+        <strong>"Старт вахты"</strong> - задать дату начала рабочего цикла
     </div>
     <div style="margin-bottom: 8px;">
         <strong>"Сегодня"</strong> - вернуться к текущей дате
@@ -828,4 +828,5 @@ function renderCalendar() {
 }
 
 // Инициализация при загрузке страницы
+
 document.addEventListener('DOMContentLoaded', initCalendar);
