@@ -1,14 +1,13 @@
 import telebot
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
-# ВАШ ТОКЕН ОТ BOTFATHER (замените на тот, что получите)
 BOT_TOKEN = "8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64"
+YOUR_USER_ID = 5160108515  # ⚠️ Ваш ID
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    # ВАШ РЕАЛЬНЫЙ URL
     web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
     
     keyboard = InlineKeyboardMarkup()
@@ -22,6 +21,8 @@ def send_welcome(message):
     welcome_text = """
 🗓️ *Добро пожаловать в календарь вахтовика!*
 
+*Версия 0.1 (тестовая)*
+
 *Основные возможности:*
 • 📋 График работы 28/28
 • 🏝️ Два режима: Стандарт и Сахалин  
@@ -34,13 +35,59 @@ def send_welcome(message):
 2. Установите дату начала вахты  
 3. Двойной клик для редактирования дня
 4. Данные сохраняются в вашем браузере
-    """
+
+*⚠️ Это тестовая версия!*
+Если обнаружите ошибки или есть предложения - напишите разработчику
+
+*Для обратной связи:*
+/feedback - сообщить об ошибке
+/contact - связь с разработчиком
+
+*Приятного использования!* 🚀
+"""
     
     bot.send_message(
         message.chat.id,
         welcome_text,
         reply_markup=keyboard,
         parse_mode='Markdown'
+    )
+
+@bot.message_handler(commands=['feedback'])
+def get_feedback(message):
+    feedback_text = message.text.replace('/feedback', '').strip()
+    
+    user_info = f"Пользователь: {message.from_user.first_name}"
+    if message.from_user.username:
+        user_info += f" (@{message.from_user.username})"
+    
+    if not feedback_text:
+        # Если сообщение пустое - просим написать текст
+        bot.reply_to(
+            message,
+            "📝 *Отправьте обратную связь*\n\n"
+            "Напишите сообщение об ошибке или предложении:\n"
+            "`/feedback ваш текст здесь`\n\n"
+            "_Пример:_ /feedback не работает кнопка 'Старт вахты'",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Отправляем фидбек себе
+    bot.send_message(
+        YOUR_USER_ID, 
+        f"📝 Новый фидбек:\n{user_info}\nID: {message.from_user.id}\n\nСообщение: {feedback_text}"
+    )
+    bot.reply_to(message, "✅ Спасибо за обратную связь! Сообщение отправлено разработчику.")
+
+@bot.message_handler(commands=['contact'])
+def contact_developer(message):
+    bot.reply_to(
+        message, 
+        "📧 Связь с разработчиком:\n\n"
+        "• Напишите /feedback ваше_сообщение\n" 
+        "• Или напишите напрямую: @dordvip\n\n"
+        "Сообщайте об ошибках и предложениях!"
     )
 
 @bot.message_handler(commands=['calendar'])
@@ -66,5 +113,5 @@ def echo_all(message):
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
 if __name__ == "__main__":
-    print("Бот запущен! Ищите @VakhtaCalendarBot в Telegram")
+    print("Бот запущен! Ищите в Telegram")
     bot.polling(none_stop=True)
