@@ -306,4 +306,75 @@ footer {
         font-size: 10px;
         padding: 4px 6px;
     }
+/* Исправление для мобильных устройств */
+@media (max-width: 480px) {
+    .container {
+        margin: 5px;
+        padding: 5px;
+        border-radius: 10px;
+    }
+    
+    .calendar {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        padding: 1px;
+    }
+    
+    .day {
+        min-height: 50px;
+        padding: 3px;
+        font-size: 10px;
+    }
+    
+    .day-number {
+        font-size: 10px;
+        margin-bottom: 2px;
+    }
+    
+    .day-status {
+        font-size: 8px;
+        line-height: 1.1;
+    }
+    
+    .controls {
+        padding: 10px;
+        gap: 10px;
+    }
+    
+    .date-controls, .actions {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .actions button {
+        font-size: 10px;
+        padding: 4px 6px;
+        margin: 1px;
+    }
+    
+    .legend {
+        padding: 10px;
+        gap: 5px;
+    }
+    
+    .legend-item {
+        font-size: 10px;
+    }
+}
+
+/* Дополнительные исправления для очень маленьких экранов */
+@media (max-width: 360px) {
+    .day {
+        min-height: 45px;
+    }
+    
+    .day-status {
+        font-size: 7px;
+    }
+    
+    .actions button {
+        font-size: 9px;
+        padding: 3px 5px;
+    }
+}
 }
