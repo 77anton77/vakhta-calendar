@@ -4,6 +4,7 @@
     box-sizing: border-box;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+<link rel="stylesheet" href="style.css?v=4">
 
 body {
     background: linear-gradient(135deg, #1e3c72, #2a5298);
@@ -470,3 +471,4 @@ footer {
     gap: 6px;
     flex-wrap: wrap;
 }
+
