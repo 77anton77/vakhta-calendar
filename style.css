@@ -378,3 +378,95 @@ footer {
     }
 }
 }
+/* Исправление для кнопок на мобильных */
+@media (max-width: 480px) {
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px;
+    }
+    
+    .date-controls {
+        order: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: nowrap;
+    }
+    
+    .date-controls button {
+        padding: 6px 8px;
+        font-size: 11px;
+        min-width: 40px;
+    }
+    
+    .current-month {
+        font-size: 14px;
+        padding: 5px 8px;
+        margin: 0 5px;
+        min-width: 120px;
+        text-align: center;
+    }
+    
+    .actions {
+        order: 2;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        justify-content: center;
+    }
+    
+    .actions button {
+        font-size: 10px;
+        padding: 5px 7px;
+        margin: 1px;
+        flex: 1;
+        min-width: 70px;
+        max-width: 100px;
+    }
+    
+    /* Убедимся что кнопки не переносятся в 2 строки */
+    .date-controls {
+        white-space: nowrap;
+    }
+}
+
+/* Для очень маленьких экранов */
+@media (max-width: 360px) {
+    .date-controls button {
+        padding: 5px 6px;
+        font-size: 10px;
+        min-width: 35px;
+    }
+    
+    .current-month {
+        font-size: 12px;
+        min-width: 100px;
+    }
+    
+    .actions button {
+        font-size: 9px;
+        padding: 4px 5px;
+        min-width: 60px;
+    }
+}
+
+/* Дополнительные исправления для структуры */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.date-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
