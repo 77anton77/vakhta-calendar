@@ -1,8 +1,14 @@
 import os
 import telebot
+from flask import Flask, request
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from threading import Thread
 
-BOT_TOKEN = os.environ['BOT_TOKEN']
+# Инициализация Flask приложения
+app = Flask(__name__)
+
+# Конфигурация бота
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64')
 YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -111,6 +117,40 @@ def open_calendar(message):
 def echo_all(message):
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
+# Flask endpoints для health checks
+@app.route('/')
+def health_check():
+    return "🤖 Бот вахтового календаря работает!", 200
+
+@app.route('/health')
+def health():
+    return "✅ OK", 200
+
+@app.route('/webhook/' + BOT_TOKEN, methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Forbidden', 403
+
+def run_flask():
+    """Запуск Flask сервера в отдельном потоке"""
+    app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
+
 if __name__ == "__main__":
+    # Запускаем Flask сервер в фоне
+    flask_thread = Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
     print("🤖 Бот запущен на Fly.io! 🚀")
-    bot.infinity_polling()
+    print("📡 Flask сервер запущен на порту 8080")
+    
+    # Запускаем бота
+    try:
+        bot.infinity_polling(timeout=20, long_polling_timeout=5)
+    except Exception as e:
+        print(f"❌ Ошибка бота: {e}")
+        print("🔄 Перезапуск через 10 секунд...")
