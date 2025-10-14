@@ -1,15 +1,11 @@
 import telebot
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from flask import Flask
 import threading
 
 BOT_TOKEN = "8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64"
 YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
-
-# Фиктивный веб-сервер для Render
-app = Flask(__name__)
 
 @app.route('/')
 def home():
