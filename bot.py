@@ -112,5 +112,5 @@ def echo_all(message):
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
 if __name__ == "__main__":
-   print("🤖 Бот запущен на Fly.io! 🚀")
+    print("🤖 Бот запущен на Fly.io! 🚀")
     bot.infinity_polling()
