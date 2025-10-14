@@ -1,10 +1,30 @@
 import telebot
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from flask import Flask
+import threading
 
 BOT_TOKEN = "8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64"
-YOUR_USER_ID = 5160108515  # ⚠️ Ваш ID
+YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Фиктивный веб-сервер для Render
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "🤖 Бот календаря вахтовика работает! ✅"
+
+@app.route('/health')
+def health():
+    return "OK"
+
+@app.route('/ping')
+def ping():
+    return "pong"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -62,7 +82,6 @@ def get_feedback(message):
         user_info += f" (@{message.from_user.username})"
     
     if not feedback_text:
-        # Если сообщение пустое - просим написать текст
         bot.reply_to(
             message,
             "📝 *Отправьте обратную связь*\n\n"
@@ -73,7 +92,6 @@ def get_feedback(message):
         )
         return
     
-    # Отправляем фидбек себе
     bot.send_message(
         YOUR_USER_ID, 
         f"📝 Новый фидбек:\n{user_info}\nID: {message.from_user.id}\n\nСообщение: {feedback_text}"
@@ -86,7 +104,7 @@ def contact_developer(message):
         message, 
         "📧 Связь с разработчиком:\n\n"
         "• Напишите /feedback ваше_сообщение\n" 
-        "• Или напишите напрямую: @dordvip\n\n"
+        "• Или напишите напрямую\n\n"
         "Сообщайте об ошибках и предложениях!"
     )
 
@@ -113,5 +131,12 @@ def echo_all(message):
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
 if __name__ == "__main__":
-    print("Бот запущен! Ищите в Telegram")
-    bot.polling(none_stop=True)
+    print("Бот запущен на Render! 🚀")
+    
+    # Запускаем Flask в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    # Запускаем бота
+    bot.infinity_polling()
