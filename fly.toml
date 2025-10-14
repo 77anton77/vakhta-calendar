@@ -10,13 +10,20 @@ primary_region = "arn"
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = false  # ⬅️ ВАЖНО! Отключаем автостоп
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 1    # ⬅️ ВАЖНО! Минимум 1 машина
+  min_machines_running = 1
 
 [[http_service.checks]]
   grace_period = "10s"
   interval = "15s"
+  method = "GET"
+  path = "/health"
+  timeout = "2s"
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
   method = "GET"
   path = "/"
   timeout = "2s"
