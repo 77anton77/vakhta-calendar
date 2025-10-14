@@ -1,27 +1,39 @@
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
+import telebot
+from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+import time
 
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b'Bot is running!')
+BOT_TOKEN = "8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64"
+YOUR_USER_ID = 5160108515
+
+bot = telebot.TeleBot(BOT_TOKEN)
+
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
     
-    def log_message(self, format, *args):
-        pass  # Отключаем логи
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("📅 Открыть календарь", web_app=web_app))
+    
+    bot.send_message(message.chat.id, "🗓️ Календарь вахтовика", reply_markup=keyboard)
 
-def run_http_server():
-    server = HTTPServer(('0.0.0.0', 10000), SimpleHandler)
-    server.serve_forever()
+@bot.message_handler(commands=['feedback'])
+def get_feedback(message):
+    feedback_text = message.text.replace('/feedback', '').strip()
+    if feedback_text:
+        bot.send_message(YOUR_USER_ID, f"Фидбек: {feedback_text}")
+        bot.reply_to(message, "✅ Спасибо!")
+    else:
+        bot.reply_to(message, "Напишите: /feedback ваш_текст")
+
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    bot.reply_to(message, "Напишите /start")
 
 if __name__ == "__main__":
-    print("Бот запущен на Render! 🚀")
-    
-    # Запускаем HTTP сервер в отдельном потоке
-    http_thread = threading.Thread(target=run_http_server)
-    http_thread.daemon = True
-    http_thread.start()
-    
-    # Запускаем бота
-    bot.infinity_polling()
+    print("🤖 Бот запущен!")
+    while True:
+        try:
+            bot.infinity_polling()
+        except Exception as e:
+            print(f"Ошибка: {e}")
+            time.sleep(10)
