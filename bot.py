@@ -2,9 +2,7 @@ import os
 import telebot
 from flask import Flask, request
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from threading import Thread
 
-# Инициализация Flask приложения
 app = Flask(__name__)
 
 # Конфигурация бота
@@ -117,10 +115,10 @@ def open_calendar(message):
 def echo_all(message):
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
-# Flask endpoints для health checks
+# Flask endpoints для health checks и webhook
 @app.route('/')
 def health_check():
-    return "🤖 Бот вахтового календаря работает!", 200
+    return "🤖 Бот вахтового календаря работает (Webhook)! 🚀", 200
 
 @app.route('/health')
 def health():
@@ -135,22 +133,49 @@ def webhook():
         return 'OK', 200
     return 'Forbidden', 403
 
-def run_flask():
-    """Запуск Flask сервера в отдельном потоке"""
-    app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
+@app.route('/set_webhook')
+def set_webhook():
+    try:
+        # Удаляем старый webhook
+        bot.remove_webhook()
+        
+        # Устанавливаем новый webhook
+        app_url = os.environ.get('FLY_APP_NAME', 'vakhta-bot.fly.dev')
+        webhook_url = f'https://{app_url}/webhook/{BOT_TOKEN}'
+        result = bot.set_webhook(url=webhook_url)
+        
+        return f"✅ Webhook установлен: {result}<br>URL: {webhook_url}", 200
+    except Exception as e:
+        return f"❌ Ошибка установки webhook: {e}", 500
+
+@app.route('/remove_webhook')
+def remove_webhook():
+    try:
+        result = bot.remove_webhook()
+        return f"✅ Webhook удален: {result}", 200
+    except Exception as e:
+        return f"❌ Ошибка удаления webhook: {e}", 500
 
 if __name__ == "__main__":
-    # Запускаем Flask сервер в фоне
-    flask_thread = Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
+    # Автоматически настраиваем webhook при запуске
+    try:
+        print("🔄 Настраиваю webhook...")
+        app_url = os.environ.get('FLY_APP_NAME', 'vakhta-bot.fly.dev')
+        webhook_url = f'https://{app_url}/webhook/{BOT_TOKEN}'
+        
+        # Удаляем старый webhook
+        bot.remove_webhook()
+        
+        # Устанавливаем новый webhook
+        bot.set_webhook(url=webhook_url)
+        
+        print(f"✅ Webhook установлен: {webhook_url}")
+    except Exception as e:
+        print(f"⚠️ Ошибка настройки webhook: {e}")
+        print("🔄 Продолжаю запуск...")
     
-    print("🤖 Бот запущен на Fly.io! 🚀")
+    print("🤖 Бот запущен в режиме Webhook! 🚀")
     print("📡 Flask сервер запущен на порту 8080")
     
-    # Запускаем бота
-    try:
-        bot.infinity_polling(timeout=20, long_polling_timeout=5)
-    except Exception as e:
-        print(f"❌ Ошибка бота: {e}")
-        print("🔄 Перезапуск через 10 секунд...")
+    # Запускаем Flask сервер (бот работает через webhook)
+    app.run(host='0.0.0.0', port=8080, debug=False)
