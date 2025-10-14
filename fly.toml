@@ -20,10 +20,3 @@ primary_region = "arn"
   method = "GET"
   path = "/health"
   timeout = "2s"
-
-[[http_service.checks]]
-  grace_period = "10s"
-  interval = "30s"
-  method = "GET"
-  path = "/"
-  timeout = "2s"
