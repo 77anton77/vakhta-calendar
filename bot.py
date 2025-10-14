@@ -1,7 +1,8 @@
+import os
 import telebot
 from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
-BOT_TOKEN = "8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64"
+BOT_TOKEN = os.environ['BOT_TOKEN']
 YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
