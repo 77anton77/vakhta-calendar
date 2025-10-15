@@ -94,7 +94,18 @@ def contact_developer(message):
         "• Или напишите напрямую\n\n"
         "Сообщайте об ошибках и предложениях!"
     )
-
+@bot.message_handler(commands=['calendar'])
+def quick_calendar(message):
+    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
+    
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("📅 Календарь", web_app=web_app))
+    
+    bot.send_message(
+        message.chat.id,
+        "Быстрый доступ к календарю:",
+        reply_markup=keyboard
+    )
 @bot.message_handler(commands=['calendar'])
 def open_calendar(message):
     web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
