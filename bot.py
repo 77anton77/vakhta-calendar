@@ -1,3 +1,18 @@
+import sys
+import os
+import locale
+
+# Устанавливаем русскую локаль
+try:
+    locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_ALL, 'Russian_Russia.1251')
+    except:
+        pass
+
+# Устанавливаем кодировку для вывода
+sys.stdout.reconfigure(encoding='utf-8')
 import os
 import telebot
 from flask import Flask, request
