@@ -25,11 +25,11 @@ YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ⭐ ПРОСТОЕ МЕНЮ С КНОПКАМИ ПОД ПОЛЕМ ВВОДА
+# ⭐ СОЗДАЕМ ПРОСТЫЕ КНОПКИ ПОД ПОЛЕМ ВВОДА
 def create_main_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("📅 Открыть календарь"))
-    keyboard.add(KeyboardButton("ℹ️ Помощь"), KeyboardButton("📊 Статистика"))
+    keyboard.row(KeyboardButton("📅 ОТКРЫТЬ КАЛЕНДАРЬ"))
+    keyboard.row(KeyboardButton("❓ Помощь"), KeyboardButton("📊 Статистика"))
     return keyboard
 
 @bot.message_handler(commands=['start', 'help'])
@@ -40,7 +40,7 @@ def send_welcome(message):
     inline_keyboard = InlineKeyboardMarkup()
     inline_keyboard.add(
         InlineKeyboardButton(
-            "📅 Открыть календарь вахтовика", 
+            "📅 Нажмите чтобы открыть календарь", 
             web_app=web_app
         )
     )
@@ -55,29 +55,28 @@ def send_welcome(message):
 • Статистика больничных/отпусков
 • Автосохранение данных
 
-*Откройте календарь одной из кнопок ниже:*
+*Используйте кнопку «📅 ОТКРЫТЬ КАЛЕНДАРЬ» ниже для быстрого доступа!*
 """
     
-    # Отправляем сообщение с инлайн кнопкой И обычной клавиатурой
+    # Отправляем сообщение с инлайн кнопкой
     bot.send_message(
         message.chat.id,
         welcome_text,
         reply_markup=inline_keyboard,
-        parse_mode='Markdown',
-        disable_web_page_preview=True
+        parse_mode='Markdown'
     )
     
-    # Отправляем отдельное сообщение с постоянными кнопками
+    # Отправляем клавиатуру с кнопками
     bot.send_message(
         message.chat.id,
-        "📱 *Быстрый доступ к функциям:*",
+        "👇 *Быстрый доступ:*",
         reply_markup=create_main_keyboard(),
         parse_mode='Markdown'
     )
 
-@bot.message_handler(func=lambda message: message.text == "📅 Открыть календарь")
-def open_calendar_from_button(message):
-    """Обработка нажатия на кнопку 'Открыть календарь'"""
+# ⭐ ОБРАБОТЧИКИ ДЛЯ КНОПОК
+@bot.message_handler(func=lambda message: message.text == "📅 ОТКРЫТЬ КАЛЕНДАРЬ")
+def open_calendar_button(message):
     web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
     
     keyboard = InlineKeyboardMarkup()
@@ -90,86 +89,93 @@ def open_calendar_from_button(message):
     
     bot.send_message(
         message.chat.id,
-        "Открываю календарь вахтовика...",
+        "🔄 Открываю календарь вахтовика...",
         reply_markup=keyboard
     )
 
-@bot.message_handler(func=lambda message: message.text == "ℹ️ Помощь")
-def show_help(message):
+@bot.message_handler(func=lambda message: message.text == "❓ Помощь")
+def help_button(message):
     help_text = """
-*📋 Справка по календарю вахтовика*
-
-*Основные функции:*
-• *Стандарт/Сахалин* - выбор режима работы
-• *Старт вахты* - установка даты начала вахты
-• *Статистика* - просмотр статистики
-• *Сбросить изменения* - вернуть исходные настройки
+*❓ Справка по календарю*
 
 *Как пользоваться:*
-1. Нажмите 'Старт вахты' и выберите дату
-2. Календарь автоматически построит график 28/28
-3. Меняйте тип дней кликом по датам
+1. Нажмите «📅 ОТКРЫТЬ КАЛЕНДАРЬ»
+2. В календаре нажмите «Старт вахты»
+3. Выберите дату начала вахты
+4. Календарь построит график 28/28 автоматически
+
+*Функции:*
+• Стандарт/Сахалин - режимы работы
+• Клик по дню - изменить тип дня
+• Статистика - просмотр статистики
 """
     bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
 
 @bot.message_handler(func=lambda message: message.text == "📊 Статистика")
-def show_stats_info(message):
-    bot.send_message(message.chat.id, "📊 Статистика доступна в веб-версии календаря. Нажмите '📅 Открыть календарь' и затем кнопку 'Статистика'.")
-
-@bot.message_handler(commands=['calendar'])
-def quick_calendar(message):
+def stats_button(message):
     web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
     
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
         InlineKeyboardButton(
-            "📅 Открыть календарь вахтовика", 
+            "📅 Открыть календарь для просмотра статистики", 
             web_app=web_app
         )
     )
     
     bot.send_message(
         message.chat.id,
-        "Нажмите кнопку чтобы открыть календарь вахтовика:",
+        "📊 Статистика доступна в веб-версии календаря:",
+        reply_markup=keyboard
+    )
+
+@bot.message_handler(commands=['calendar'])
+def calendar_command(message):
+    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
+    
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton(
+            "📅 Открыть календарь", 
+            web_app=web_app
+        )
+    )
+    
+    bot.send_message(
+        message.chat.id,
+        "Нажмите кнопку чтобы открыть календарь:",
         reply_markup=keyboard
     )
 
 @bot.message_handler(commands=['feedback'])
-def get_feedback(message):
+def feedback_command(message):
     feedback_text = message.text.replace('/feedback', '').strip()
     
     if not feedback_text:
-        bot.reply_to(
-            message,
-            "📝 *Отправьте обратную связь*\n\n"
-            "Напишите сообщение об ошибке или предложении:\n"
-            "`/feedback ваш текст здесь`",
-            parse_mode='Markdown'
-        )
+        bot.reply_to(message, "Напишите: /feedback ваш_текст")
         return
     
-    user_info = f"Пользователь: {message.from_user.first_name}"
-    if message.from_user.username:
-        user_info += f" (@{message.from_user.username})"
+    user_info = f"Пользователь: {message.from_user.first_name} (@{message.from_user.username})" if message.from_user.username else f"Пользователь: {message.from_user.first_name}"
     
     bot.send_message(
         YOUR_USER_ID, 
-        f"📝 Новый фидбек:\n{user_info}\nID: {message.from_user.id}\n\nСообщение: {feedback_text}"
+        f"📝 Фидбек:\n{user_info}\nID: {message.from_user.id}\n\n{feedback_text}"
     )
-    bot.reply_to(message, "✅ Спасибо за обратную связь! Сообщение отправлено разработчику.")
+    bot.reply_to(message, "✅ Спасибо! Сообщение отправлено.")
 
+# Обработка любых других сообщений
 @bot.message_handler(func=lambda message: True)
-def echo_all(message):
+def other_messages(message):
     bot.send_message(
         message.chat.id, 
-        "Напишите /start для открытия календаря\nИли используйте кнопки ниже:",
+        "Используйте кнопку «📅 ОТКРЫТЬ КАЛЕНДАРЬ» ниже 👇",
         reply_markup=create_main_keyboard()
     )
 
 # Flask endpoints
 @app.route('/')
-def health_check():
-    return "🤖 Бот вахтового календаря работает! 🚀", 200
+def home():
+    return "🤖 Бот работает! 🚀", 200
 
 @app.route('/health')
 def health():
@@ -185,16 +191,14 @@ def webhook():
     return 'Forbidden', 403
 
 if __name__ == "__main__":
-    print("🤖 Бот запускается...")
+    print("🤖 Запуск бота...")
     
     try:
-        app_url = os.environ.get('FLY_APP_NAME', 'vakhta-bot.fly.dev')
-        webhook_url = f'https://{app_url}/webhook/{BOT_TOKEN}'
         bot.remove_webhook()
-        bot.set_webhook(url=webhook_url)
-        print(f"✅ Webhook установлен: {webhook_url}")
+        bot.set_webhook(url=f'https://vakhta-bot.fly.dev/webhook/{BOT_TOKEN}')
+        print("✅ Webhook установлен")
     except Exception as e:
         print(f"⚠️ Ошибка webhook: {e}")
     
-    print("🤖 Бот запущен! 🚀")
+    print("🚀 Бот запущен!")
     app.run(host='0.0.0.0', port=8080, debug=False)
