@@ -1,6 +1,7 @@
 import sys
 import os
 import locale
+import requests
 
 # Устанавливаем русскую локаль
 try:
@@ -24,9 +25,34 @@ app = Flask(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64')
 YOUR_USER_ID = 5160108515
 
-bot = telebot.TeleBot(BOT_TOKEN)
+# ⭐ НАСТРОЙКА МЕНЮ КНОПКИ ЧЕРЕЗ TELEGRAM API
+def setup_menu_button():
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/setChatMenuButton"
+        payload = {
+            "menu_button": {
+                "type": "web_app",
+                "text": "📅 Открыть календарь",
+                "web_app": {
+                    "url": "https://77anton77.github.io/vakhta-calendar/"
+                }
+            }
+        }
+        response = requests.post(url, json=payload)
+        result = response.json()
+        
+        if result.get('ok'):
+            print("✅ Меню кнопка '📅 Открыть календарь' установлена через API")
+            return True
+        else:
+            print(f"❌ Ошибка API: {result}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Ошибка установки меню кнопки: {e}")
+        return False
 
-# ⭐ НАСТРОЙКА КОМАНД БОТА (появится в меню слева от поля ввода)
+# ⭐ НАСТРОЙКА КОМАНД БОТА
 def setup_bot_commands():
     try:
         commands = [
@@ -41,8 +67,11 @@ def setup_bot_commands():
         print(f"❌ Ошибка установки команд: {e}")
         return False
 
-# Устанавливаем команды при запуске
-commands_setup_result = setup_bot_commands()
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Вызываем настройки при запуске
+menu_button_setup = setup_menu_button()
+commands_setup = setup_bot_commands()
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -69,7 +98,7 @@ def send_welcome(message):
 *Доступ к календарю:*
 • Кнопка ниже ⬇️
 • Команда /calendar
-• Иконка меню слева от поля ввода 📱
+• Меню справа от поля ввода 📱
 """
     
     bot.send_message(
@@ -99,6 +128,30 @@ def quick_calendar(message):
         reply_markup=keyboard
     )
 
+@bot.message_handler(commands=['setup_menu'])
+def setup_menu_command(message):
+    """Принудительная установка меню кнопки"""
+    if message.from_user.id == YOUR_USER_ID:
+        result = setup_menu_button()
+        if result:
+            bot.reply_to(message, "✅ Меню кнопка установлена принудительно")
+        else:
+            bot.reply_to(message, "❌ Ошибка установки меню кнопки")
+    else:
+        bot.reply_to(message, "Эта команда только для разработчика")
+
+@bot.message_handler(commands=['setup_commands'])
+def setup_commands_command(message):
+    """Принудительная установка команд"""
+    if message.from_user.id == YOUR_USER_ID:
+        result = setup_bot_commands()
+        if result:
+            bot.reply_to(message, "✅ Команды бота установлены принудительно")
+        else:
+            bot.reply_to(message, "❌ Ошибка установки команд")
+    else:
+        bot.reply_to(message, "Эта команда только для разработчика")
+
 @bot.message_handler(commands=['feedback'])
 def get_feedback(message):
     """Обратная связь"""
@@ -125,18 +178,6 @@ def get_feedback(message):
     )
     bot.reply_to(message, "✅ Спасибо за обратную связь! Сообщение отправлено разработчику.")
 
-@bot.message_handler(commands=['setup_commands'])
-def setup_commands_manual(message):
-    """Принудительная установка команд"""
-    if message.from_user.id == YOUR_USER_ID:
-        result = setup_bot_commands()
-        if result:
-            bot.reply_to(message, "✅ Команды бота установлены принудительно")
-        else:
-            bot.reply_to(message, "❌ Ошибка установки команд")
-    else:
-        bot.reply_to(message, "Эта команда только для разработчика")
-
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     """Обработка любых других сообщений"""
@@ -145,8 +186,9 @@ def echo_all(message):
 # Flask endpoints для health checks и webhook
 @app.route('/')
 def health_check():
-    commands_status = "✅" if commands_setup_result else "❌"
-    return f"🤖 Бот вахтового календаря работает! Команды: {commands_status} 🚀", 200
+    menu_status = "✅" if menu_button_setup else "❌"
+    commands_status = "✅" if commands_setup else "❌"
+    return f"🤖 Бот работает! Меню: {menu_status} | Команды: {commands_status} 🚀", 200
 
 @app.route('/health')
 def health():
@@ -161,28 +203,30 @@ def webhook():
         return 'OK', 200
     return 'Forbidden', 403
 
+@app.route('/set_webhook')
+def set_webhook():
+    try:
+        bot.remove_webhook()
+        app_url = os.environ.get('FLY_APP_NAME', 'vakhta-bot.fly.dev')
+        webhook_url = f'https://{app_url}/webhook/{BOT_TOKEN}'
+        result = bot.set_webhook(url=webhook_url)
+        return f"✅ Webhook установлен: {result}<br>URL: {webhook_url}", 200
+    except Exception as e:
+        return f"❌ Ошибка установки webhook: {e}", 500
+
 if __name__ == "__main__":
-    print(f"🤖 Статус команд бота: {'✅ Установлены' if commands_setup_result else '❌ Не установлены'}")
+    print(f"🤖 Статус меню кнопки: {'✅ Установлена' if menu_button_setup else '❌ Не установлена'}")
+    print(f"🤖 Статус команд бота: {'✅ Установлены' if commands_setup else '❌ Не установлены'}")
     
-    # Автоматически настраиваем webhook при запуске
     try:
         print("🔄 Настраиваю webhook...")
         app_url = os.environ.get('FLY_APP_NAME', 'vakhta-bot.fly.dev')
         webhook_url = f'https://{app_url}/webhook/{BOT_TOKEN}'
-        
-        # Удаляем старый webhook
         bot.remove_webhook()
-        
-        # Устанавливаем новый webhook
         bot.set_webhook(url=webhook_url)
-        
         print(f"✅ Webhook установлен: {webhook_url}")
     except Exception as e:
         print(f"⚠️ Ошибка настройки webhook: {e}")
-        print("🔄 Продолжаю запуск...")
     
     print("🤖 Бот запущен в режиме Webhook! 🚀")
-    print("📡 Flask сервер запущен на порту 8080")
-    
-    # Запускаем Flask сервер (бот работает через webhook)
     app.run(host='0.0.0.0', port=8080, debug=False)
