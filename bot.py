@@ -24,20 +24,33 @@ app = Flask(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64')
 YOUR_USER_ID = 5160108515
 
+# ⭐ ВАЖНО: Инициализируем бота до установки меню кнопки
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ⭐ ДОБАВЛЕНО: Устанавливаем меню кнопку "Открыть календарь" ⭐
-try:
-    bot.set_chat_menu_button(
-        chat_id=None,  # Для всех чатов
-        menu_button=MenuButtonWebApp(
+# ⭐ ПРАВИЛЬНАЯ УСТАНОВКА МЕНЮ КНОПКИ
+def setup_menu_button():
+    try:
+        from telebot import apihelper
+        
+        # Создаем объект меню кнопки
+        menu_button = MenuButtonWebApp(
             text="📅 Открыть календарь",
             web_app=WebAppInfo(url="https://77anton77.github.io/vakhta-calendar/")
         )
-    )
-    print("✅ Меню кнопка 'Открыть календарь' установлена")
-except Exception as e:
-    print(f"❌ Ошибка установки меню кнопки: {e}")
+        
+        # Устанавливаем через прямой API вызов
+        result = bot.set_chat_menu_button(
+            chat_id=None,  # Для всех чатов
+            menu_button=menu_button
+        )
+        print(f"✅ Меню кнопка установлена: {result}")
+        return True
+    except Exception as e:
+        print(f"❌ Ошибка установки меню кнопки: {e}")
+        return False
+
+# Вызываем установку меню кнопки при запуске
+menu_setup_result = setup_menu_button()
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -62,6 +75,8 @@ def send_welcome(message):
 • Автосохранение данных
 
 *Кнопка календаря всегда доступна в этом сообщении!*
+
+💡 *Совет:* Кнопка календаря также доступна в меню справа от поля ввода!
 """
     
     bot.send_message(
@@ -90,6 +105,18 @@ def quick_calendar(message):
         "Нажмите кнопку чтобы открыть календарь вахтовика:",
         reply_markup=keyboard
     )
+
+@bot.message_handler(commands=['menu_setup'])
+def force_menu_setup(message):
+    """Принудительная установка меню кнопки"""
+    if message.from_user.id == YOUR_USER_ID:  # Только для разработчика
+        result = setup_menu_button()
+        if result:
+            bot.reply_to(message, "✅ Меню кнопка установлена принудительно")
+        else:
+            bot.reply_to(message, "❌ Ошибка установки меню кнопки")
+    else:
+        bot.reply_to(message, "Эта команда только для разработчика")
 
 @bot.message_handler(commands=['feedback'])
 def get_feedback(message):
@@ -136,7 +163,8 @@ def echo_all(message):
 # Flask endpoints для health checks и webhook
 @app.route('/')
 def health_check():
-    return "🤖 Бот вахтового календаря работает (Webhook)! 🚀", 200
+    menu_status = "✅" if menu_setup_result else "❌"
+    return f"🤖 Бот вахтового календаря работает! Меню кнопка: {menu_status} 🚀", 200
 
 @app.route('/health')
 def health():
@@ -175,6 +203,8 @@ def remove_webhook():
         return f"❌ Ошибка удаления webhook: {e}", 500
 
 if __name__ == "__main__":
+    print(f"🤖 Статус меню кнопки: {'✅ Установлена' if menu_setup_result else '❌ Не установлена'}")
+    
     # Автоматически настраиваем webhook при запуске
     try:
         print("🔄 Настраиваю webhook...")
