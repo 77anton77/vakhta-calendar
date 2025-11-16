@@ -13,10 +13,10 @@ except:
 
 # Устанавливаем кодировку для вывода
 sys.stdout.reconfigure(encoding='utf-8')
-import os
+
 import telebot
 from flask import Flask, request
-from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton, MenuButtonWebApp
 
 app = Flask(__name__)
 
@@ -25,6 +25,19 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', '8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_h
 YOUR_USER_ID = 5160108515
 
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# ⭐ ДОБАВЛЕНО: Устанавливаем меню кнопку "Открыть календарь" ⭐
+try:
+    bot.set_chat_menu_button(
+        chat_id=None,  # Для всех чатов
+        menu_button=MenuButtonWebApp(
+            text="📅 Открыть календарь",
+            web_app=WebAppInfo(url="https://77anton77.github.io/vakhta-calendar/")
+        )
+    )
+    print("✅ Меню кнопка 'Открыть календарь' установлена")
+except Exception as e:
+    print(f"❌ Ошибка установки меню кнопки: {e}")
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -51,7 +64,6 @@ def send_welcome(message):
 *Кнопка календаря всегда доступна в этом сообщении!*
 """
     
-    # Отправляем сообщение с ПОСТОЯННОЙ клавиатурой
     bot.send_message(
         message.chat.id,
         welcome_text,
@@ -60,8 +72,28 @@ def send_welcome(message):
         disable_web_page_preview=True
     )
 
+@bot.message_handler(commands=['calendar'])
+def quick_calendar(message):
+    """Быстрый доступ к календарю"""
+    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
+    
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton(
+            "📅 Открыть календарь вахтовика", 
+            web_app=web_app
+        )
+    )
+    
+    bot.send_message(
+        message.chat.id,
+        "Нажмите кнопку чтобы открыть календарь вахтовика:",
+        reply_markup=keyboard
+    )
+
 @bot.message_handler(commands=['feedback'])
 def get_feedback(message):
+    """Обратная связь"""
     feedback_text = message.text.replace('/feedback', '').strip()
     
     user_info = f"Пользователь: {message.from_user.first_name}"
@@ -87,6 +119,7 @@ def get_feedback(message):
 
 @bot.message_handler(commands=['contact'])
 def contact_developer(message):
+    """Связь с разработчиком"""
     bot.reply_to(
         message, 
         "📧 Связь с разработчиком:\n\n"
@@ -94,38 +127,10 @@ def contact_developer(message):
         "• Или напишите напрямую\n\n"
         "Сообщайте об ошибках и предложениях!"
     )
-@bot.message_handler(commands=['calendar'])
-def quick_calendar(message):
-    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
-    
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton("📅 Календарь", web_app=web_app))
-    
-    bot.send_message(
-        message.chat.id,
-        "Быстрый доступ к календарю:",
-        reply_markup=keyboard
-    )
-@bot.message_handler(commands=['calendar'])
-def open_calendar(message):
-    web_app = WebAppInfo("https://77anton77.github.io/vakhta-calendar/")
-    
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton(
-            "📅 Открыть календарь", 
-            web_app=web_app
-        )
-    )
-    
-    bot.send_message(
-        message.chat.id,
-        "Нажмите кнопку чтобы открыть календарь вахтовика:",
-        reply_markup=keyboard
-    )
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
+    """Обработка любых других сообщений"""
     bot.reply_to(message, "Напишите /start для открытия календаря")
 
 # Flask endpoints для health checks и webhook
