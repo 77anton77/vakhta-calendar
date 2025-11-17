@@ -1,7 +1,15 @@
+import os
+import time
+from dotenv import load_dotenv
 import telebot
-from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
-BOT_TOKEN = '8315566098:AAEIVhFSbWLkvdRsdRaWrrzwzU_hBlf8X64'
+# Загружаем переменные из .env
+load_dotenv()
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+YOUR_USER_ID = int(os.getenv('YOUR_USER_ID'))
+
 bot = telebot.TeleBot(BOT_TOKEN)
 
 def get_main_keyboard():
