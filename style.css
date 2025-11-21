@@ -348,7 +348,7 @@ button:hover {
 }
 #schedule-select-btn:hover { transform: translateY(-1px); }
 
-/* ========== ЕДИНЫЙ АКЦЕНТ ДЛЯ "СЕГОДНЯ" (МЕСЯЦ + ГОД) ========== */
+/* Единый акцент для "сегодня" (месяц и год) */
 :root {
   --today-ring: #00bfa5; /* бирюзовый акцент (виден на любых фонах) */
 }
@@ -357,11 +357,11 @@ button:hover {
 .month-day.today {
   position: relative;
   outline: 2px solid var(--today-ring) !important;
-  outline-offset: -2px; /* рисуем обводку внутри, чтобы сетка не "прыгала" */
+  outline-offset: -2px; /* обводка внутри, чтобы сетка не "прыгала" */
   box-shadow: 0 0 0 3px rgba(0, 191, 165, 0.18); /* мягкое свечение */
 }
 
-/* Метка в правом верхнем углу — и в месяце, и в годовом виде */
+/* Метка в правом верхнем углу — базовый вариант (месячный вид) */
 .day.today::after,
 .month-day.today::after {
   content: "";
@@ -371,9 +371,33 @@ button:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 2px var(--today-ring); /* контур метки, чтобы был виден на ярких фонах */
+  background: #fff; /* белая “точка” */
+  box-shadow: 0 0 0 2px var(--today-ring); /* бирюзовый контур */
+  pointer-events: none; /* не перекрывает клики */
 }
+
+/* В годовом мини‑виде — меньше и только кольцо (не закрывает цифры) */
+.month-day.today::after {
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  background: transparent;           /* без заливки */
+  box-shadow: none;                  /* убираем толстый контур от базового правила */
+  border: 1.5px solid var(--today-ring);
+}
+
+/* Для сверхузких экранов можно ещё уменьшить маркер */
+@media (max-width: 480px) {
+  .month-day.today::after {
+    top: 1px;
+    right: 1px;
+    width: 4px;
+    height: 4px;
+    border-width: 1.25px;
+  }
+}
+
 
 /* ========== БЛОКИРОВКА КОПИРОВАНИЯ В КАЛЕНДАРЕ (чтобы long-press не вызывал меню) ========== */
 .calendar,
@@ -526,3 +550,4 @@ footer {
         color: #666;
     }
 }
+
