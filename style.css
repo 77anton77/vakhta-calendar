@@ -348,9 +348,11 @@ button:hover {
 }
 #schedule-select-btn:hover { transform: translateY(-1px); }
 
-/* Единый акцент для "сегодня" (месяц и год) */
+/* ========== ЕДИНЫЙ АКЦЕНТ ДЛЯ "СЕГОДНЯ" (МЕСЯЦ + ГОД) ========== */
 :root {
-  --today-ring: #00bfa5; /* бирюзовый акцент (виден на любых фонах) */
+  --today-ring: #000000;    /* Чёрная обводка “сегодня” */
+  --today-dim-month: 0.08;  /* затемнение в месячном виде */
+  --today-dim-year:  0.07;  /* затемнение в годовом мини‑виде */
 }
 
 .day.today,
@@ -358,10 +360,25 @@ button:hover {
   position: relative;
   outline: 2px solid var(--today-ring) !important;
   outline-offset: -2px; /* обводка внутри, чтобы сетка не "прыгала" */
-  box-shadow: 0 0 0 3px rgba(0, 191, 165, 0.18); /* мягкое свечение */
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.18); /* мягкое свечение */
 }
 
-/* Метка в правом верхнем углу — базовый вариант (месячный вид) */
+/* Нежное затемнение текущего дня (поверх цвета статуса, но под меткой) */
+.day.today::before,
+.month-day.today::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1; /* затемнение ниже метки (::after) */
+}
+.day.today::before       { background: rgba(0, 0, 0, var(--today-dim-month)); }
+.month-day.today::before { background: rgba(0, 0, 0, var(--today-dim-year)); }
+/* Для белого "Отдых" чуть мягче затемнение (по желанию) */
+.day.status-rest.today::before { background: rgba(0, 0, 0, 0.06); }
+
+/* Метка-«точка» в правом верхнем углу (бросается в глаза на любых фонах) */
 .day.today::after,
 .month-day.today::after {
   content: "";
@@ -371,33 +388,31 @@ button:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fff; /* белая “точка” */
-  box-shadow: 0 0 0 2px var(--today-ring); /* бирюзовый контур */
-  pointer-events: none; /* не перекрывает клики */
+  background: #000;               /* Чёрная точка */
+  box-shadow: 0 0 0 2px #fff;     /* Белый ореол — видна на тёмных фонах */
+  pointer-events: none;
+  z-index: 2; /* метка поверх затемнения */
 }
 
-/* В годовом мини‑виде — меньше и только кольцо (не закрывает цифры) */
+/* В годовом мини‑виде — меньше и совсем в угол, чтобы не закрывать цифры */
 .month-day.today::after {
   top: 2px;
   right: 2px;
   width: 5px;
   height: 5px;
-  background: transparent;           /* без заливки */
-  box-shadow: none;                  /* убираем толстый контур от базового правила */
-  border: 1.5px solid var(--today-ring);
+  box-shadow: 0 0 0 1.5px #fff; /* ореол потоньше */
 }
 
-/* Для сверхузких экранов можно ещё уменьшить маркер */
+/* На сверхузких экранах ещё компактнее */
 @media (max-width: 480px) {
   .month-day.today::after {
     top: 1px;
     right: 1px;
     width: 4px;
     height: 4px;
-    border-width: 1.25px;
+    box-shadow: 0 0 0 1.25px #fff;
   }
 }
-
 
 /* ========== БЛОКИРОВКА КОПИРОВАНИЯ В КАЛЕНДАРЕ (чтобы long-press не вызывал меню) ========== */
 .calendar,
@@ -550,4 +565,3 @@ footer {
         color: #666;
     }
 }
-
