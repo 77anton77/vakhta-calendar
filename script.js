@@ -370,29 +370,37 @@ function renderCalendar() {
   const calendarEl = document.getElementById('calendar');
   const dayHeaders = calendarEl.querySelectorAll('.day-header');
 
+  // Сброс ресайз‑наблюдателей
   if (yearResizeObserver) { try { yearResizeObserver.disconnect(); } catch {} yearResizeObserver = null; }
   if (monthResizeObserver) { try { monthResizeObserver.disconnect(); } catch {} monthResizeObserver = null; }
 
+  // Ссылка на панель управления (нужно для скрытия/показа месячной навигации)
+  const controls = document.querySelector('.controls');
+
+  // ГОДОВОЙ ВИД
   if (currentView === 'year') {
+    // Подготовка контейнера
     dayHeaders.forEach(h => h.style.display = 'none');
     calendarEl.classList.add('year-mode');
-    const controls = document.querySelector('.controls');
-if (controls) controls.classList.add('hide-date-controls');
 
+    // Скрываем ТОЛЬКО кнопки листания МЕСЯЦА (‹ Мес / Мес ›), годовые кнопки остаются
+    if (controls) controls.classList.add('hide-month-nav');
 
+    // Перерисовка года
     const oldYear = calendarEl.querySelector('.year-view');
     if (oldYear) oldYear.remove();
-
     renderYearView();
     return;
   }
 
+  // МЕСЯЧНЫЙ ВИД
   calendarEl.classList.remove('year-mode');
-  const controls = document.querySelector('.controls');
-if (controls) controls.classList.remove('hide-date-controls');
-
   dayHeaders.forEach(h => h.style.display = 'grid');
 
+  // Возвращаем месячную навигацию
+  if (controls) controls.classList.remove('hide-month-nav');
+
+  // Сброс выбора/жестов
   clearSelectionHighlight();
   document.body.classList.remove('range-selecting');
   selecting = false;
@@ -401,12 +409,15 @@ if (controls) controls.classList.remove('hide-date-controls');
 
   const currentMonthEl = document.getElementById('current-month');
 
+  // Очистка сетки (оставляем только 7 заголовков дней недели)
   while (calendarEl.children.length > 7) {
     calendarEl.removeChild(calendarEl.lastChild);
   }
 
+  // Подпись текущего месяца/года
   currentMonthEl.textContent = currentDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
 
+  // Рендер ячеек месяца
   const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
@@ -430,12 +441,14 @@ if (controls) controls.classList.remove('hide-date-controls');
     calendarEl.appendChild(createDayElement(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, d), true));
   }
 
+  // Автоподгон строк под доступную высоту + наблюдатель
   fitMonthRows();
   monthResizeObserver = new ResizeObserver(() => fitMonthRows());
   monthResizeObserver.observe(calendarEl);
 
   updateLegendVisibility();
 }
+
 
 // ========================
 // Установка старта вахты
