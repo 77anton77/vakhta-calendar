@@ -376,6 +376,9 @@ function renderCalendar() {
   if (currentView === 'year') {
     dayHeaders.forEach(h => h.style.display = 'none');
     calendarEl.classList.add('year-mode');
+    const controls = document.querySelector('.controls');
+if (controls) controls.classList.add('hide-date-controls');
+
 
     const oldYear = calendarEl.querySelector('.year-view');
     if (oldYear) oldYear.remove();
@@ -385,6 +388,9 @@ function renderCalendar() {
   }
 
   calendarEl.classList.remove('year-mode');
+  const controls = document.querySelector('.controls');
+if (controls) controls.classList.remove('hide-date-controls');
+
   dayHeaders.forEach(h => h.style.display = 'grid');
 
   clearSelectionHighlight();
