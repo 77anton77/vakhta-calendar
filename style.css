@@ -31,30 +31,25 @@ body {
 header {
     background: linear-gradient(135deg, #2c3e50, #3498db);
     color: white;
-    padding: 20px;
+    padding: 20px; /* на мобильных уменьшим, см. @media (max-width: 480px) */
     text-align: center;
     flex-shrink: 0;
 }
 
 h1 {
-    font-size: 28px;
-    margin-bottom: 10px;
-}
-
-.subtitle {
-    font-size: 16px;
-    opacity: 0.9;
+    font-size: 28px; /* на мобильных уменьшим */
+    margin-bottom: 0; /* подзаголовок удалён, отступ не нужен */
 }
 
 /* ========== CONTROLS ========== */
 .controls {
     display: flex;
     justify-content: space-between;
-    padding: 15px 20px;
+    padding: 15px 20px;  /* на мобильных уменьшим */
     background: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 15px; /* на мобильных уменьшим */
     flex-shrink: 0;
 }
 
@@ -92,7 +87,7 @@ button:hover {
 .current-month:hover { background-color: #e9ecef; }
 
 .actions {
-    display: flex;
+    display: flex;       /* на мобильных переопределим в grid 2 колонки */
     gap: 8px;
     flex-wrap: wrap;
 }
@@ -170,7 +165,7 @@ button:hover {
     border: 1px solid #dee2e6;
 }
 
-/* Лёглый фон “сегодня” (как дополнительный намёк). Статусы ниже перекрывают его */
+/* Лёгкий фон “сегодня” (как дополнительный намёк). Статусы ниже перекрывают его */
 .today { background: #fff3cd; }
 
 /* ========== STATUS COLORS ========== */
@@ -238,17 +233,12 @@ button:hover {
 }
 
 /* ========== YEAR VIEW (SCROLLABLE, NO SCALE) ========== */
-/* Контейнер календаря в годовом режиме — разрешаем прокрутку */
 .calendar.year-mode {
     display: flex;
     flex-direction: column;
-    overflow: auto; /* без масштабирования — скроллим при нехватке места */
+    overflow: auto;
 }
-
-/* Скрыть заголовки дней недели в годовом режиме */
 .calendar.year-mode .day-header { display: none !important; }
-
-/* Сетка года: авто‑подбор колонок, фиксированный минимальный размер карточек */
 .calendar .year-view {
     grid-column: 1 / -1;
     width: 100%;
@@ -261,8 +251,6 @@ button:hover {
     background: white;
     box-sizing: border-box;
 }
-
-/* Карточка месяца */
 .month-overview {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
@@ -279,7 +267,6 @@ button:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     border-color: #3498db;
 }
-
 .month-header {
     display: flex;
     justify-content: space-between;
@@ -289,14 +276,12 @@ button:hover {
     border-bottom: 1px solid #f0f0f0;
     flex-shrink: 0;
 }
-
 .month-name {
     font-weight: bold;
     font-size: 14px;
     color: #2c3e50;
     text-transform: lowercase;
 }
-
 .month-stats {
     font-size: 11px;
     color: #7f8c8d;
@@ -305,8 +290,6 @@ button:hover {
     border-radius: 8px;
     font-weight: 600;
 }
-
-/* Сетка дней внутри мини-месяца (6 строк всегда) */
 .month-days-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -350,49 +333,43 @@ button:hover {
 #schedule-select-btn:hover { transform: translateY(-1px); }
 
 /* ========== ЕДИНЫЙ АКЦЕНТ ДЛЯ "СЕГОДНЯ" (МЕСЯЦ + ГОД) ========== */
-/* Здесь настраиваем ВИДИМОСТЬ “сегодня”:
-   - Цвет рамки:        --today-ring
-   - Цвет метки-точки:  --today-dot
-   - Цвет ореола метки: --today-dot-halo
-   - Толщина рамки:     --today-ring-month-w (месяц), --today-ring-year-w (год)
-   - Интенсивность свечения: --today-glow-month / --today-glow-year
-   - Степень затемнения: --today-dim-month / --today-dim-year
-   - Размер метки:      --today-dot-month-size / --today-dot-year-size
+/* Где менять:
+   --today-ring (цвет рамки), --today-dot (цвет метки), --today-dot-halo (ореол),
+   --today-ring-month-w (толщина в месяце), --today-ring-year-w (толщина в годовом),
+   --today-dim-month/--today-dim-year (затемнение), --today-glow-month/--today-glow-year (свечение),
+   --today-dot-month-size/--today-dot-year-size (размер метки).
+   outline-offset отрицательный — рисуем обводку ВНУТРИ клетки, чтобы сетка не "прыгала".
 */
 :root {
-  --today-ring:   #000000;   /* ЧЁРНАЯ рамка (смените при желании) */
-  --today-dot:    #000000;   /* ЧЁРНАЯ метка‑точка */
-  --today-dot-halo: #ffffff; /* белый ореол вокруг метки — виден на тёмных фонах */
+  --today-ring:   #000000;
+  --today-dot:    #000000;
+  --today-dot-halo: #ffffff;
 
-  --today-ring-month-w: 4px;   /* ТОЛЩИНА рамки в месячном виде */
-  --today-ring-year-w:  2px; /* ТОЛЩИНА рамки в годовом мини‑виде */
+  --today-ring-month-w: 4px;
+  --today-ring-year-w:  2px;
 
-  --today-glow-month: 3px;  /* мягкое свечение рамки в месяце */
-  --today-glow-year:  1px;  /* мягкое свечение рамки в годовом виде */
+  --today-glow-month: 3px;
+  --today-glow-year:  1px;
 
-  --today-dim-month: 0.08;  /* затемнение клетки в месяце (0..0.2) */
-  --today-dim-year:  0.05;  /* затемнение клетки в годовом виде (0..0.2) */
+  --today-dim-month: 0.08;
+  --today-dim-year:  0.05;
 
-  --today-dot-month-size: 8px; /* размер метки в месячном виде */
-  --today-dot-year-size:  4px; /* размер метки в годовом виде */
+  --today-dot-month-size: 8px;
+  --today-dot-year-size:  4px;
 
-  --today-dot-month-offset: 4px; /* отступ метки от верх/правого краёв (месяц) */
-  --today-dot-year-offset:  2px; /* отступ метки (год) */
+  --today-dot-month-offset: 4px;
+  --today-dot-year-offset:  2px;
 
-  --today-dot-month-halo-w: 2px;    /* толщина белого ореола в месяце */
-  --today-dot-year-halo-w:  1.25px; /* толщина белого ореола в годовом виде */
+  --today-dot-month-halo-w: 2px;
+  --today-dot-year-halo-w:  1.25px;
 }
 
-/* МЕСЯЧНЫЙ вид — рамка “сегодня” */
-/* outline-offset: рисуем обводку ВНУТРИ, чтобы сетка не "прыгала" от толщины рамки */
 .day.today {
   position: relative;
   outline: var(--today-ring-month-w) solid var(--today-ring) !important;
   outline-offset: calc(-1 * var(--today-ring-month-w)); /* обводка внутри, чтобы сетка не "прыгала" */
   box-shadow: 0 0 0 var(--today-glow-month) rgba(0,0,0,0.18);
 }
-
-/* ГОДОВОЙ мини‑вид — более тонкая рамка “сегодня” */
 .month-day.today {
   position: relative;
   outline: var(--today-ring-year-w) solid var(--today-ring) !important;
@@ -400,7 +377,7 @@ button:hover {
   box-shadow: 0 0 0 var(--today-glow-year) rgba(0,0,0,0.15);
 }
 
-/* Нежное затемнение текущего дня (поверх цвета статуса, но под меткой) */
+/* Нежное затемнение текущего дня (под меткой) */
 .day.today::before,
 .month-day.today::before {
   content: "";
@@ -408,14 +385,13 @@ button:hover {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  z-index: 1; /* затемнение ниже метки (::after) */
+  z-index: 1;
 }
 .day.today::before       { background: rgba(0,0,0, var(--today-dim-month)); }
 .month-day.today::before { background: rgba(0,0,0, var(--today-dim-year)); }
-/* Для белого "Отдых" чуть мягче затемнение (по желанию) */
 .day.status-rest.today::before { background: rgba(0,0,0,0.06); }
 
-/* Метка‑"точка" в правом верхнем углу (видна на любых фонах) */
+/* Метка-«точка» */
 .day.today::after {
   content: "";
   position: absolute;
@@ -425,12 +401,10 @@ button:hover {
   height: var(--today-dot-month-size);
   border-radius: 50%;
   background: var(--today-dot);
-  box-shadow: 0 0 0 var(--today-dot-month-halo-w) var(--today-dot-halo); /* белый ореол */
+  box-shadow: 0 0 0 var(--today-dot-month-halo-w) var(--today-dot-halo);
   pointer-events: none;
-  z-index: 2; /* метка поверх затемнения */
+  z-index: 2;
 }
-
-/* Метка в ГОДОВОМ мини‑виде — ещё меньше и ближе к углу, чтобы не закрывать цифры */
 .month-day.today::after {
   content: "";
   position: absolute;
@@ -499,9 +473,31 @@ footer {
 }
 
 @media (max-width: 480px) {
-    .calendar { grid-template-columns: repeat(7, 1fr); }
+    /* Сжатая шапка и панели — больше места календарю */
+    header { padding: 10px 12px; }
+    h1 { font-size: 20px; }
 
-    .calendar.year-mode { overflow: auto; }
+    .controls { padding: 10px 12px; gap: 10px; }
+
+    /* Кнопки: две колонки + комфортная высота и отступы */
+    .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 8px;
+        width: 100%;
+    }
+    .actions button {
+        width: 100%;
+        min-height: 44px;          /* комфортный touch‑target */
+        font-size: 13px;
+        padding: 10px 12px;
+        white-space: normal;       /* разрешаем перенос строк */
+        line-height: 1.2;
+    }
+
+    .calendar.year-mode {
+        overflow: auto;
+    }
     .calendar .year-view {
         grid-template-columns: repeat(2, minmax(160px, 1fr));
         grid-auto-rows: minmax(140px, auto);
@@ -520,9 +516,8 @@ footer {
 
     .day { min-height: 60px; }
     .day-status { font-size: 9px; }
-    .actions { gap: 5px; }
-    .actions button { font-size: 10px; padding: 4px 6px; }
-    #schedule-select-btn { min-height: 40px; font-size: 10px; padding: 6px 8px; }
+    .actions { gap: 8px; }
+    #schedule-select-btn { min-height: 44px; font-size: 13px; }
 
     .container { margin: 5px; border-radius: 10px; }
     body { padding: 5px; }
@@ -570,15 +565,10 @@ footer {
     /* В годовом — скрыты, как и в UI */
     .calendar.year-mode .day-header { display: none !important; }
   
-    .month-overview:hover {
-        transform: none !important;
-        box-shadow: none !important;
-    }
+    .month-overview:hover { transform: none !important; box-shadow: none !important; }
   
     /* Спрятать любые модальные overlay, если неожиданно открыты */
-    body > div[style*="position: fixed"] {
-        display: none !important;
-    }
+    body > div[style*="position: fixed"] { display: none !important; }
   
     /* Заголовок печати */
     .print-title {
