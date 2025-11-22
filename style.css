@@ -181,6 +181,28 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .legend-item { font-size: 11px; }
   footer { padding: 6px; font-size: 11px; }
 }
+/* Небольшая заметка под статусом */
+.day-note {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #6b7280;
+  word-break: break-word;
+  overflow-wrap: anywhere; /* на всякий */
+  white-space: normal;
+}
+
+/* Если показываем ТОЛЬКО заметку вместо "Командировка" */
+.day-note-only {
+  margin-top: 0;            /* без лишнего отступа, т.к. нет заголовка */
+  text-align: center;
+}
+
+/* на мобильных сделать чуть меньше шрифт */
+@media (max-width: 480px) {
+  .day-note { font-size: 9px; }
+}
+
 
 /* ========== PRINT ========== */
 @media print {
