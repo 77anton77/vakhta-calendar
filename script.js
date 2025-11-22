@@ -4,15 +4,14 @@
 let currentDate = new Date();
 let vakhtaStartDate = null;
 let manualOverrides = {};
+let manualNotes = {};           // НОВОЕ: заметки по датам { 'YYYY-MM-DD': 'текст' }
 let currentSchedule = 'standard'; // 'standard', 'sakhalin', 'standard-day', 'sakhalin-day'
 let currentView = 'year';         // 'month' | 'year'
-// чувствительность к движению до старта long-press (адаптация под DPR)
 
+// чувствительность к движению до старта long-press (адаптация под DPR)
 const LONG_PRESS_MS = 380; // было 450 — чуть быстрее, удобнее
 const MOVE_CANCEL_PX = Math.max(14, Math.round(10 * (window.devicePixelRatio || 1))); // минимум 14px
 const DRAG_MIN_DATES = 2; // минимум 2 даты для массового окна (оставляем)
-
-
 
 // Жесты редактирования на телефоне: 'single' | 'double'
 let editGestureMode = localStorage.getItem('editGestureMode') || 'double';
@@ -217,6 +216,12 @@ function loadSavedData() {
       if (!isNaN(d)) vakhtaStartDate = d;
     }
     if (data.manualOverrides) manualOverrides = data.manualOverrides;
+
+    // НОВОЕ: заметки для командировок
+    if (data.manualNotes && typeof data.manualNotes === 'object') {
+      manualNotes = data.manualNotes;
+    }
+
     if (data.currentView) currentView = data.currentView === 'year' ? 'year' : 'month';
   }
   updateScheduleButtonText();
@@ -226,6 +231,7 @@ function saveData() {
   localStorage.setItem('vakhtaCalendarData', JSON.stringify({
     vakhtaStartDate: vakhtaStartDate ? vakhtaStartDate.toISOString() : null,
     manualOverrides,
+    manualNotes,         // НОВОЕ
     currentSchedule,
     currentView
   }));
@@ -259,30 +265,30 @@ function initTelegramApp() {
 
 function setupEventListeners() {
   // Гасим системное контекстное меню по долгому тапу в календаре
-document.addEventListener('contextmenu', (e) => {
-  if (e.target.closest && e.target.closest('.calendar')) {
-    e.preventDefault();
-  }
-});
-
-// Запрещаем старт выделения текста внутри календаря (кроме input/textarea)
-document.addEventListener('selectstart', (e) => {
-  const el = e.target;
-  if (el && el.closest && el.closest('.calendar')) {
-    const tag = el.tagName;
-    if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+  document.addEventListener('contextmenu', (e) => {
+    if (e.target.closest && e.target.closest('.calendar')) {
       e.preventDefault();
     }
-  }
-});
+  });
 
-// На всякий случай снимаем любое текущее выделение при начале рисования диапазона
-document.addEventListener('touchstart', (e) => {
-  if (e.target.closest && e.target.closest('.calendar')) {
-    const sel = window.getSelection && window.getSelection();
-    if (sel && sel.removeAllRanges) sel.removeAllRanges();
-  }
-}, { passive: true });
+  // Запрещаем старт выделения текста внутри календаря (кроме input/textarea)
+  document.addEventListener('selectstart', (e) => {
+    const el = e.target;
+    if (el && el.closest && el.closest('.calendar')) {
+      const tag = el.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+      }
+    }
+  });
+
+  // На всякий случай снимаем любое текущее выделение при начале рисования диапазона
+  document.addEventListener('touchstart', (e) => {
+    if (e.target.closest && e.target.closest('.calendar')) {
+      const sel = window.getSelection && window.getSelection();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    }
+  }, { passive: true });
 
   document.getElementById('prev-month').addEventListener('click', () => {
     currentDate.setMonth(currentDate.getMonth() - 1);
@@ -355,9 +361,19 @@ function createDayElement(date, isOtherMonth) {
   if (manualOverrides[dateStr]) classes.push('manual-override');
 
   dayEl.className = classes.join(' ');
+
+  // ЗАМЕТКИ ДЛЯ КОМАНДИРОВКИ:
+  // если статус = "Командировка" и есть заметка — показываем ТОЛЬКО заметку
+  let statusHtml = '';
+  if (status === 'business-trip' && manualNotes[dateStr]) {
+    statusHtml = `<div class="day-note day-note-only">${escapeHtml(manualNotes[dateStr])}</div>`;
+  } else {
+    statusHtml = getStatusText(status);
+  }
+
   dayEl.innerHTML = `
     <div class="day-number">${date.getDate()}</div>
-    <div class="day-status">${getStatusText(status)}</div>
+    <div class="day-status">${statusHtml}</div>
   `;
   dayEl.setAttribute('data-date', dateStr);
 
@@ -365,6 +381,7 @@ function createDayElement(date, isOtherMonth) {
   addDayTouchHandlers(dayEl);
   return dayEl;
 }
+
 
 function renderCalendar() {
   const calendarEl = document.getElementById('calendar');
@@ -571,7 +588,7 @@ function getStatusText(status) {
 }
 
 // ========================
-// Редактирование дня (один день)
+// Редактирование дня (один день) — с заметкой для командировки
 // ========================
 function editDayManually(date) {
   const dateStr = date.toISOString().split('T')[0];
@@ -583,18 +600,21 @@ function editDayManually(date) {
     display: flex; justify-content: center; align-items: center; z-index: 1000;
   `;
   modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 300px;">
+    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 320px;">
       <h3 style="margin-bottom: 15px; text-align: center;">
         Редактирование дня<br>
         <small>${date.toLocaleDateString('ru-RU')}</small>
       </h3>
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px;">Текущий статус:</label>
+
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; margin-bottom: 6px;">Текущий статус:</label>
         <div style="padding: 8px; background: #f8f9fa; border-radius: 5px; margin-bottom: 10px;">
           ${getStatusText(currentStatus)}
         </div>
       </div>
-      <select id="status-select" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px;">
+
+      <label style="display:block; margin: 10px 0 6px;">Новый статус</label>
+      <select id="status-select" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px;">
         <option value="auto">Автоматически (по графику)</option>
         <option value="rest">Отдых</option>
         <option value="plane-from-home">✈️ Самолет</option>
@@ -608,29 +628,67 @@ function editDayManually(date) {
         <option value="business-trip">🧳 Командировка</option>
         <option value="vacation">🏖️ Отпуск</option>
       </select>
+
+      <div id="note-wrap" style="display:none; margin-bottom: 10px;">
+        <label for="note-input" style="display:block; margin-bottom:6px;">Заметка (что за командировка):</label>
+        <input id="note-input" type="text"
+               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+          Заметка отобразится маленьким текстом под словом «Командировка».
+        </div>
+      </div>
+
       <div style="display: flex; gap: 10px;">
-        <button id="save-edit" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px;">Сохранить</button>
-        <button id="cancel-edit" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 5px;">Отмена</button>
-        ${manualOverrides[dateStr] ? `<button id="reset-edit" style="flex: 1; padding: 10px; background: #e67e22; color: white; border: none; border-radius: 5px;">Сбросить</button>` : ''}
+        <button id="save-edit" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 6px;">Сохранить</button>
+        <button id="cancel-edit" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px;">Отмена</button>
+        ${manualOverrides[dateStr] ? `<button id="reset-edit" style="flex: 1; padding: 10px; background: #e67e22; color: white; border: none; border-radius: 6px;">Сбросить</button>` : ''}
       </div>
     </div>
   `;
   document.body.appendChild(modal);
 
   const select = modal.querySelector('#status-select');
+  const noteWrap = modal.querySelector('#note-wrap');
+  const noteInput = modal.querySelector('#note-input');
+
   if (manualOverrides[dateStr]) select.value = manualOverrides[dateStr];
 
+  const syncNoteVisibility = () => {
+    if (select.value === 'business-trip') {
+      noteWrap.style.display = '';
+      noteInput.value = manualNotes[dateStr] || '';
+    } else {
+      noteWrap.style.display = 'none';
+    }
+  };
+  syncNoteVisibility();
+  select.addEventListener('change', syncNoteVisibility);
+
   modal.querySelector('#save-edit').addEventListener('click', () => {
-    if (select.value === 'auto') delete manualOverrides[dateStr];
-    else manualOverrides[dateStr] = select.value;
+    const val = select.value;
+    if (val === 'auto') {
+      delete manualOverrides[dateStr];
+      delete manualNotes[dateStr];
+    } else {
+      manualOverrides[dateStr] = val;
+      if (val === 'business-trip') {
+        const t = (noteInput.value || '').trim();
+        if (t) manualNotes[dateStr] = t; else delete manualNotes[dateStr];
+      } else {
+        delete manualNotes[dateStr];
+      }
+    }
     saveData();
     renderCalendar();
     document.body.removeChild(modal);
   });
 
   if (manualOverrides[dateStr]) {
-    modal.querySelector('#reset-edit').addEventListener('click', () => {
+    const btn = modal.querySelector('#reset-edit');
+    if (btn) btn.addEventListener('click', () => {
       delete manualOverrides[dateStr];
+      delete manualNotes[dateStr];
       saveData();
       renderCalendar();
       document.body.removeChild(modal);
@@ -644,7 +702,7 @@ function editDayManually(date) {
 }
 
 // ========================
-// Массовое редактирование (тач + ПК)
+// Массовое редактирование (тач + ПК) — с заметкой для командировки
 // ========================
 function addDayTouchHandlers(el) {
   let touchStartTime = 0;
@@ -696,7 +754,6 @@ function addDayTouchHandlers(el) {
     const dy = t.clientY - startY;
 
     // Отменяем long-press до старта выбора только при ЯВНОМ вертикальном скролле
-    // Горизонтальное смещение до старта НЕ отменяет — чтобы легче было включить выбор
     if (!selecting) {
       const dist = Math.hypot(dx, dy);
       if (dist > MOVE_CANCEL_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -792,8 +849,6 @@ function addDayTouchHandlers(el) {
   });
 }
 
-
-
 function setupMouseRangeSelection() {
   document.addEventListener('mousedown', (e) => {
     if (currentView !== 'month') return;
@@ -848,8 +903,9 @@ function updateSelectionHighlight() {
     }
   });
 }
+
 // ========================
-// Модалка массового редактирования диапазона
+// Модалка массового редактирования диапазона (с заметкой для командировки)
 // ========================
 function openBulkEditModalForRange() {
   if (!selectionStartDate || !selectionEndDate) return;
@@ -863,13 +919,14 @@ function openBulkEditModalForRange() {
     display: flex; justify-content: center; align-items: center; z-index: 1000;
   `;
   modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 92%; max-width: 340px;">
+    <div style="background: white; padding: 20px; border-radius: 10px; width: 92%; max-width: 360px;">
       <h3 style="margin-bottom: 10px; text-align: center;">Массовое редактирование дат</h3>
       <div style="font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 12px;">
         Даты: ${selectionStartDate.toLocaleDateString('ru-RU')} — ${selectionEndDate.toLocaleDateString('ru-RU')}<br>
         Всего: ${count} ${pluralDays(count)}
       </div>
-      <select id="bulk-status" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px;">
+      <label style="display:block; margin: 8px 0 6px;">Выберите статус</label>
+      <select id="bulk-status" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px;">
         <option value="auto">Автоматически (по графику)</option>
         <option value="rest">Отдых</option>
         <option value="plane-from-home">✈️ Самолет</option>
@@ -883,7 +940,18 @@ function openBulkEditModalForRange() {
         <option value="business-trip">🧳 Командировка</option>
         <option value="vacation">🏖️ Отпуск</option>
       </select>
-      <div style="display: flex; gap: 10px;">
+
+      <div id="bulk-note-wrap" style="display:none; margin-bottom: 10px;">
+        <label for="bulk-note" style="display:block; margin-bottom:6px;">Заметка для всех дней (командировка):</label>
+        <input id="bulk-note" type="text"
+               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+          Одна и та же заметка будет установлена для всех выбранных дат со статусом «Командировка».
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button id="bulk-apply" style="flex: 1; padding: 10px; background: #27ae60; color:#fff; border:none; border-radius:6px;">Применить</button>
         <button id="bulk-cancel" style="flex: 1; padding: 10px; background: #e74c3c; color:#fff; border:none; border-radius:6px;">Отмена</button>
       </div>
@@ -892,11 +960,20 @@ function openBulkEditModalForRange() {
   document.body.appendChild(modal);
 
   const selectEl = modal.querySelector('#bulk-status');
+  const noteWrap = modal.querySelector('#bulk-note-wrap');
+  const noteInput = modal.querySelector('#bulk-note');
+
   // восстановить последний выбранный статус
   try {
     const saved = localStorage.getItem('lastBulkStatus') || 'auto';
     selectEl.value = saved;
   } catch {}
+
+  const sync = () => {
+    noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
+  };
+  sync();
+  selectEl.addEventListener('change', sync);
 
   const closeModal = () => {
     document.body.removeChild(modal);
@@ -907,10 +984,22 @@ function openBulkEditModalForRange() {
     // запомнить выбранный статус на будущее
     try { localStorage.setItem('lastBulkStatus', val); } catch {}
 
+    const noteText = (noteInput.value || '').trim();
+
     dsList.forEach(ds => {
-      if (val === 'auto') delete manualOverrides[ds];
-      else manualOverrides[ds] = val;
+      if (val === 'auto') {
+        delete manualOverrides[ds];
+        delete manualNotes[ds];
+      } else {
+        manualOverrides[ds] = val;
+        if (val === 'business-trip') {
+          if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
+        } else {
+          delete manualNotes[ds];
+        }
+      }
     });
+
     saveData();
     clearSelectionHighlight(); // снять подсветку
     renderCalendar();
@@ -930,7 +1019,6 @@ function openBulkEditModalForRange() {
     }
   });
 }
-
 
 function clearSelectionHighlight() {
   selectionEls.forEach(el => el.classList.remove('range-selected'));
@@ -1019,12 +1107,13 @@ function setupSwipeNavigation() {
 // Сброс ручных изменений
 // ========================
 function resetManualChanges() {
-  if (Object.keys(manualOverrides).length === 0) {
+  if (Object.keys(manualOverrides).length === 0 && Object.keys(manualNotes).length === 0) {
     alert('Нет ручных изменений для сброса');
     return;
   }
   if (confirm('Вы уверены, что хотите сбросить ВСЕ ручные изменения?')) {
     manualOverrides = {};
+    manualNotes = {};
     saveData();
     renderCalendar();
     alert('Все ручные изменения сброшены');
@@ -1441,6 +1530,17 @@ function getStatusColor(st) {
   return c[st] || '#bdc3c7';
 }
 
+function escapeHtml(s) {
+  try {
+    return String(s).replace(/[&<>"']/g, ch => (
+      ch === '&' ? '&amp;' :
+      ch === '<' ? '&lt;'  :
+      ch === '>' ? '&gt;'  :
+      ch === '"' ? '&quot;': '&#39;'
+    ));
+  } catch { return ''; }
+}
+
 // Заголовки для печати
 function showPrintTitle(title, subtitle) {
   let el = document.getElementById('print-title');
@@ -1540,7 +1640,10 @@ function buildExportPayload(full = false) {
     currentSchedule: typeof currentSchedule === 'string' ? currentSchedule : 'standard',
     vakhtaStartDate: vakhtaStartDate ? vakhtaStartDate.toISOString().split('T')[0] : null
   };
-  if (full) payload.manualOverrides = manualOverrides || {};
+  if (full) {
+    payload.manualOverrides = manualOverrides || {};
+    payload.manualNotes     = manualNotes     || {}; // НОВОЕ
+  }
   return payload;
 }
 function buildExportCode(full = false) {
@@ -1701,6 +1804,12 @@ function openShareModal() {
       } else {
         manualOverrides = {};
       }
+      // НОВОЕ: заметки
+      if (obj.manualNotes && typeof obj.manualNotes === 'object') {
+        manualNotes = obj.manualNotes;
+      } else {
+        manualNotes = {};
+      }
     }
     saveData();
     renderCalendar();
@@ -1733,6 +1842,10 @@ function applyImported(obj, full) {
     }
     if (full && obj.manualOverrides) {
       manualOverrides = obj.manualOverrides;
+    }
+    // НОВОЕ: заметки
+    if (full && obj.manualNotes && typeof obj.manualNotes === 'object') {
+      manualNotes = obj.manualNotes;
     }
     saveData && saveData();
     renderCalendar && renderCalendar();
