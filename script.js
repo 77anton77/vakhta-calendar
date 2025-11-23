@@ -161,12 +161,35 @@ function generateMonthDays(month) {
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const status = calculateVakhtaStatus(date);
-    const color = getStatusColor(status);
     const isToday = isTodayDate(date);
     const cls = `month-day ${isToday ? 'today' : ''}`;
     const sym = getStatusSymbol(status);
+
+    // Надёжный вариант: две половинки вместо градиента
+    let halvesHtml = '';
+    if (status === 'travel-to') {
+      // синий → красный
+      halvesHtml = `
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;"></div>`;
+    } else if (status === 'travel-from') {
+      // фиолетовый → синий (ночь + выезд)
+      halvesHtml = `
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#9b59b6;pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>`;
+    } else if (status === 'travel-from-day') {
+      // красный → синий (день + выезд)
+      halvesHtml = `
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>`;
+    }
+
+    // Если не «половинки» — просто цвет
+    const baseBg = (halvesHtml ? '' : `background:${getStatusColor(status)};`);
+
     html += `
-      <div class="${cls}" style="background:${color};" title="${d} ${monthNameRu(month)} - ${getStatusText(status)}">
+      <div class="${cls}" style="${baseBg}" title="${d} ${monthNameRu(month)} - ${getStatusText(status)}">
+        ${halvesHtml}
         <div class="day-number">${d}</div>
         ${sym ? `<div class="day-symbol">${sym}</div>` : ''}
       </div>
@@ -182,6 +205,8 @@ function generateMonthDays(month) {
 
   return html;
 }
+
+
 
 function getMonthStats(month) {
   const year = currentDate.getFullYear();
@@ -362,11 +387,10 @@ function createDayElement(date, isOtherMonth) {
 
   dayEl.className = classes.join(' ');
 
-  // ЗАМЕТКИ ДЛЯ КОМАНДИРОВКИ:
-  // если статус = "Командировка" и есть заметка — показываем ТОЛЬКО заметку
+  // Если "Командировка" и есть заметка — показываем только заметку (тем же кеглем, с переносами)
   let statusHtml = '';
   if (status === 'business-trip' && manualNotes[dateStr]) {
-    statusHtml = `<div class="day-note day-note-only">${escapeHtml(manualNotes[dateStr])}</div>`;
+    statusHtml = `${escapeHtml(manualNotes[dateStr])}`;
   } else {
     statusHtml = getStatusText(status);
   }
@@ -381,6 +405,7 @@ function createDayElement(date, isOtherMonth) {
   addDayTouchHandlers(dayEl);
   return dayEl;
 }
+
 
 
 function renderCalendar() {
@@ -630,14 +655,15 @@ function editDayManually(date) {
       </select>
 
       <div id="note-wrap" style="display:none; margin-bottom: 10px;">
-        <label for="note-input" style="display:block; margin-bottom:6px;">Заметка (что за командировка):</label>
-        <input id="note-input" type="text"
-               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
-               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
-        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
-          Заметка отобразится маленьким текстом под словом «Командировка».
-        </div>
-      </div>
+  <label for="note-input" style="display:block; margin-bottom:6px;">Заметка (что за командировка):</label>
+  <input id="note-input" type="text"
+         placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+         style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+  <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+    Заметка отобразится маленьким текстом вместо слова «Командировка».
+  </div>
+</div>
+
 
       <div style="display: flex; gap: 10px;">
         <button id="save-edit" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 6px;">Сохранить</button>
@@ -941,15 +967,7 @@ function openBulkEditModalForRange() {
         <option value="vacation">🏖️ Отпуск</option>
       </select>
 
-      <div id="bulk-note-wrap" style="display:none; margin-bottom: 10px;">
-        <label for="bulk-note" style="display:block; margin-bottom:6px;">Заметка для всех дней (командировка):</label>
-        <input id="bulk-note" type="text"
-               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
-               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
-        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
-          Одна и та же заметка будет установлена для всех выбранных дат со статусом «Командировка».
-        </div>
-      </div>
+      openBulkEditModalForRange
 
       <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button id="bulk-apply" style="flex: 1; padding: 10px; background: #27ae60; color:#fff; border:none; border-radius:6px;">Применить</button>
@@ -1252,12 +1270,14 @@ function showHelp() {
   modal.innerHTML = `
     <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
       <h3 style="margin-bottom: 15px; text-align: center;">📋 Справка по календарю вахтовика</h3>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">🎯 Основная логика графика</h4>
         <p><strong>График 28/28:</strong> 28 дней вахта → 28 дней отдых<br>
         <strong>Логистика = отдых:</strong> Самолет и поезд считаются днями отдыха<br>
         <strong>Рабочие дни:</strong> Заезд, дневные/ночные смены, выезд</p>
       </div>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">🎛️ Режимы работы</h4>
         <p><strong>Стандартный (дневные/ночные смены)</strong> — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
@@ -1266,6 +1286,7 @@ function showHelp() {
         <p><strong>Сахалинский дневной</strong> — без самолетов; 28 дневных; выезд: день + выезд</p>
         <p>Активный график подсвечивается зеленым цветом.</p>
       </div>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">✏️ Редактирование дней</h4>
         <p>
@@ -1283,24 +1304,45 @@ function showHelp() {
           Свайпы листают месяц/год и имеют приоритет.
         </p>
       </div>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">🗂️ Виды отображения</h4>
         <p><strong>Годовой вид:</strong> 12 мини‑месяцев на одном экране. Тап по месяцу — переход к месяцу.</p>
         <p><strong>Месячный вид:</strong> подробные статусы каждого дня, двойной клик — редактор.</p>
         <p><strong>Переключение:</strong> кнопка «📊 Годовой вид» / «📅 Месячный вид».</p>
       </div>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">📊 Статистика</h4>
         <p>Показывает число отпусков/командировок/больничных за год и делит их на <em>в рабочие</em> / <em>в дни отдыха</em>.</p>
       </div>
+
       <div style="margin-bottom: 20px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">🔄 Сброс изменений</h4>
         <p>Удаляет ВСЕ ручные изменения. Основной график вахты сохраняется.</p>
       </div>
+
+      
+      <div style="margin-bottom: 20px;">
+        <h4 style="color: #3498db; margin-bottom: 10px;">🔗 Поделиться / Экспорт · Импорт</h4>
+        <p>
+          Кнопка «Поделиться» позволяет:<br>
+          • Экспортировать <em>базовый график</em> (дата начала + режим) — короткий код для пересылки;<br>
+          • Экспортировать <em>полный снимок</em> (включая ручные правки) — длинный код;<br>
+          • Импортировать код (заменить всё или применить только базовый график);<br>
+          • Напечатать текущий месяц или весь год (можно «Сохранить как PDF»).
+        </p>
+        <p style="font-size:12px; color:#7f8c8d; margin-top:6px;">
+          При печати сохраняется выбранный период: кнопка «Печать: текущий месяц» печатает месяц из шапки календаря, кнопка «Печать: год» — текущий год.
+          Чтобы распечатать другой период, сначала переключите месяц/год в шапке, затем снова выполните печать.
+        </p>
+      </div>
+
       <div style="margin-bottom: 15px;">
         <h4 style="color: #3498db; margin-bottom: 10px;">💾 Сохранение данных</h4>
         <p>Все настройки сохраняются в браузере. При повторном открытии всё восстановится.</p>
       </div>
+
       <button id="close-help" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;">Закрыть</button>
     </div>
   `;
@@ -1342,6 +1384,7 @@ function showHelp() {
     });
   })();
 }
+
 
 // ========================
 // Выбор месяца/года
