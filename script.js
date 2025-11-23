@@ -391,8 +391,9 @@ function setupEventListeners() {
   document.getElementById('next-year').addEventListener('click', () => { currentDate.setFullYear(currentDate.getFullYear() + 1); renderCalendar(); });
   document.getElementById('today').addEventListener('click', () => { currentDate = new Date(); renderCalendar(); });
 
-  const shareBtn = document.getElementById('share');
-  if (shareBtn) shareBtn.addEventListener('click', );
+ const shareBtn = document.getElementById('share');
+if (shareBtn) shareBtn.addEventListener('click', openShareModal);
+
 
   document.getElementById('set-vakhta').addEventListener('click', setVakhtaStartDate);
   document.getElementById('show-stats').addEventListener('click', showStatistics);
@@ -2034,6 +2035,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
