@@ -89,6 +89,8 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
   }
 }
 
+
+
 @media (hover: none), (pointer: coarse) {
   .day:hover { transform: none; box-shadow: none; }
 }
@@ -255,6 +257,7 @@ body.range-selecting .day:hover {
   box-shadow: none !important;
 }
 
+
 /* ========== PRINT ========== */
 @media print {
   html, body { height: auto !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -273,4 +276,5 @@ body.range-selecting .day:hover {
 /* Скрыть ТОЛЬКО месячную навигацию в годовом виде (оставить «Год» кнопки и год по центру) */
 .controls.hide-month-nav #prev-month,
 .controls.hide-month-nav #next-month { display: none !important; }
+
 
