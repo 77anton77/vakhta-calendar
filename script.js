@@ -165,33 +165,33 @@ function generateMonthDays(month) {
     const cls = `month-day ${isToday ? 'today' : ''}`;
     const sym = getStatusSymbol(status);
 
-    // Надёжный вариант: две половинки вместо градиента
+    // Две половинки с z-index:0, чтобы были под текстом
     let halvesHtml = '';
     if (status === 'travel-to') {
       // синий → красный
       halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;"></div>`;
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;z-index:0;"></div>`;
     } else if (status === 'travel-from') {
       // фиолетовый → синий (ночь + выезд)
       halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#9b59b6;pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>`;
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#9b59b6;pointer-events:none;z-index:0;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>`;
     } else if (status === 'travel-from-day') {
       // красный → синий (день + выезд)
       halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;"></div>`;
+        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;z-index:0;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>`;
     }
 
-    // Если не «половинки» — просто цвет
+    // Если не половинки — обычный цвет
     const baseBg = (halvesHtml ? '' : `background:${getStatusColor(status)};`);
 
     html += `
       <div class="${cls}" style="${baseBg}" title="${d} ${monthNameRu(month)} - ${getStatusText(status)}">
         ${halvesHtml}
-        <div class="day-number">${d}</div>
-        ${sym ? `<div class="day-symbol">${sym}</div>` : ''}
+        <div class="day-number" style="position:relative;z-index:1;">${d}</div>
+        ${sym ? `<div class="day-symbol" style="position:relative;z-index:1;">${sym}</div>` : ''}
       </div>
     `;
   }
@@ -205,6 +205,7 @@ function generateMonthDays(month) {
 
   return html;
 }
+
 
 
 
