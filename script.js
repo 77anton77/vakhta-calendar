@@ -165,7 +165,6 @@ function generateMonthDays(month) {
     const cls = `month-day ${isToday ? 'today' : ''}`;
     const sym = getStatusSymbol(status);
 
-    // Цвет фона через градиент/цвет (без абсолютных слоёв)
     let bg = '';
     if (status === 'travel-to') {
       bg = 'background: linear-gradient(to right, #3498db 50%, #ff6b6b 50%);';
@@ -194,7 +193,6 @@ function generateMonthDays(month) {
 
   return html;
 }
-
 
 function getMonthStats(month) {
   const year = currentDate.getFullYear();
@@ -229,11 +227,9 @@ function loadSavedData() {
       if (!isNaN(d)) vakhtaStartDate = d;
     }
     if (data.manualOverrides) manualOverrides = data.manualOverrides;
-
     if (data.manualNotes && typeof data.manualNotes === 'object') {
       manualNotes = data.manualNotes;
     }
-
     if (data.currentView) currentView = data.currentView === 'year' ? 'year' : 'month';
   }
   updateScheduleButtonText();
@@ -277,7 +273,6 @@ function initTelegramApp() {
 }
 
 function setupEventListeners() {
-  // Блокируем системное меню "копировать"
   document.addEventListener('contextmenu', (e) => {
     if (e.target.closest && e.target.closest('.calendar')) e.preventDefault();
   });
@@ -351,7 +346,6 @@ function createDayElement(date, isOtherMonth) {
 
   dayEl.className = classes.join(' ');
 
-  // "Командировка" + заметка
   let statusHtml = '';
   if (status === 'business-trip' && manualNotes[dateStr]) {
     statusHtml = `${escapeHtml(manualNotes[dateStr])}`;
@@ -686,7 +680,6 @@ function addDayTouchHandlers(el) {
   el.addEventListener('touchstart', (e) => {
     if (currentView !== 'month') return;
 
-    // если был старый диапазон — снимем
     if (selectionEls && selectionEls.size) {
       clearSelectionHighlight();
     }
@@ -708,7 +701,6 @@ function addDayTouchHandlers(el) {
     selectionStartDate = new Date(ds);
     selectionEndDate = new Date(ds);
 
-    // long-press — включаем выбор, только если не было движения
     longPressTimer = setTimeout(() => {
       if (moved) return;
       selecting = true;
@@ -726,7 +718,6 @@ function addDayTouchHandlers(el) {
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
-    // Отменяем long-press до старта выбора только при явном вертикальном скролле
     if (!selecting) {
       const dist = Math.hypot(dx, dy);
       if (dist > MOVE_CANCEL_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -735,7 +726,6 @@ function addDayTouchHandlers(el) {
       }
     }
 
-    // Если уже рисуем диапазон — обновляем конечную дату под пальцем (с безопасным подбором)
     if (selecting) {
       const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
       const ds = dayEl && dayEl.getAttribute('data-date');
@@ -750,7 +740,6 @@ function addDayTouchHandlers(el) {
   const finish = (e) => {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
-    // Если рисовали диапазон — уточним конечную дату под пальцем
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
       const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
@@ -776,7 +765,6 @@ function addDayTouchHandlers(el) {
         }
       }
     } else {
-      // Обычный тап/двойной — только если не было движения
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
@@ -996,11 +984,11 @@ function getDateStringsBetween(a, b) {
   }
   return arr;
 }
+
 function findDayCellAtClientPoint(x, y) {
   const cal = document.getElementById('calendar');
   if (!cal) return null;
   const r = cal.getBoundingClientRect();
-  // Зажимаем координату внутрь календаря, чтобы не уходить в зазоры/радиусы
   const xi = Math.min(r.right - 1, Math.max(r.left + 1, x));
   const yi = Math.min(r.bottom - 1, Math.max(r.top + 1, y));
 
@@ -1008,7 +996,6 @@ function findDayCellAtClientPoint(x, y) {
   let dayEl = node && node.closest ? node.closest('.day') : null;
   if (dayEl) return dayEl;
 
-  // Сначала горизонтальные нуджи (чтобы не прыгать на другую строку)
   const hOffsets = [-1, 1, -3, 3, -5, 5, -7, 7];
   for (const dx of hOffsets) {
     node = document.elementFromPoint(xi + dx, yi);
@@ -1016,7 +1003,6 @@ function findDayCellAtClientPoint(x, y) {
     if (dayEl) return dayEl;
   }
 
-  // Как запасной вариант — небольшие вертикальные нуджи
   for (const dy of [-3, 3, -5, 5]) {
     node = document.elementFromPoint(xi, yi + dy);
     dayEl = node && node.closest ? node.closest('.day') : null;
@@ -1784,20 +1770,6 @@ function openShareModal() {
         </div>
 
         <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div style="font-weight:600; margin-bottom:8px;">Импорт</div>
-          <textarea id="import-code" placeholder="Вставьте код здесь" style="width:100%; height:80px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
-          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-              <input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)
-            </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-              <input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)
-            </label>
-            <button id="apply-import" style="margin-left:auto; padding:8px 10px; background:#3498db; color:#fff; border:none; border-radius:6px;">Импортировать</button>
-          </div>
-        </div>
-
-        <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
           <div style="font-weight:600; margin-bottom:8px;">Печать</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="print-month" style="padding:8px 10px; background:#2ecc71; color:#fff; border:none; border-radius:6px;">Печать: текущий месяц</button>
@@ -1914,7 +1886,6 @@ function sendTgSnapshot(reason) {
     if (isTGWebApp()) Telegram.WebApp.sendData(JSON.stringify(envelope));
   } catch {}
 }
-// временная тест‑кнопка (видна только в Telegram WebApp)
 function addTgTestButton() {
   if (!isTGWebApp()) return;
   const actions = document.querySelector('.actions');
@@ -1941,8 +1912,3 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
-
-
-
-
