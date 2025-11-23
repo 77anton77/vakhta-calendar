@@ -12,7 +12,7 @@ body { background: linear-gradient(135deg, #1e3c72, #2a5298); color: #333; min-h
   background: rgba(255,255,255,0.95);
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  overflow: visible;                /* было hidden — из-за него "съедались" правые ячейки */
+  overflow: visible;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 20px);
@@ -38,15 +38,16 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
 /* ========== CALENDAR (MONTH VIEW) ========== */
 .calendar {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* КРИТИЧЕСКОЕ: колонка может сжиматься до 0, содержимое больше не «раздвигает» сетку */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
   background: #bdc3c7;
   padding: 2px;
   border-radius: 8px;
   flex-grow: 1;
   min-height: 0;
-  overflow-y: auto;                 /* вертикальный скролл */
-  overflow-x: visible;              /* ВАЖНО: ничего не обрезаем по горизонтали */
+  overflow-y: auto;
+  overflow-x: visible;
 }
 
 /* Заголовки дней недели: компактные и sticky */
@@ -57,6 +58,8 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
   font-size: 11px; line-height: 1.05;
   text-align: center; font-weight: 600;
   box-shadow: 0 1px 0 rgba(0,0,0,.08);
+  /* Разрешаем сжатие содержимого, чтобы колонка не расползалась */
+  min-width: 0;
 }
 
 /* ========== DAY CELL ========== */
@@ -70,9 +73,11 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
   transition: all .2s;
   border-radius: 4px;
   border: 1px solid #e9ecef;
+  /* Разрешаем сжатие содержимого внутри колонки */
+  min-width: 0;
 }
 
-/* Эффект hover — только на устройствах с мышью (чтобы на таче ничего не "съедалось") */
+/* Эффект hover — только на устройствах с мышью (на тач — без масштаба) */
 @media (hover: hover) and (pointer: fine) {
   .day:hover {
     transform: scale(1.02);
@@ -81,18 +86,28 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
     border-color: #3498db;
   }
 }
-/* На сенсорных — без масштабирования и лишних теней, чтобы ничего не клиповалось */
 @media (hover: none), (pointer: coarse) {
   .day:hover { transform: none; box-shadow: none; }
 }
 
 .day-number { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
-.day-status { font-size: 12px; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 4px; padding: 3px; }
 
-/* Чужие дни месяца — визуально слабее (но кликабельны) */
+/* Содержимое статуса не должно раздвигать колонку */
+.day-status {
+  font-size: 12px;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 4px;
+  padding: 3px;
+  overflow: hidden;             /* не вылезаем наружу */
+  text-overflow: ellipsis;      /* если вдруг слишком длинно */
+  word-break: break-word;       /* переносим слова при необходимости */
+}
+
 .other-month { opacity: .55; }
-
-/* Лёгкий фон “сегодня” (основной акцент ниже, в :root) */
 .today { background: #fff3cd; }
 
 /* ========== STATUS COLORS (MONTH) ========== */
@@ -180,7 +195,7 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .date-controls, .actions { justify-content: center; }
 }
 
-/* Мобильная компоновка: кнопки в две колонки, компактная шапка, ничего не обрезается */
+/* Мобильная компоновка */
 @media (max-width: 480px) {
   header { padding: 6px 8px; } h1 { font-size: 18px; }
   .controls { padding: 6px 8px; gap: 6px; }
@@ -224,7 +239,6 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .month-day .day-symbol { display: none; }
 
   .day-header { padding: 6px 3px; font-size: 10px; line-height: 1.05; }
-
   .day { min-height: 50px; padding: 3px; }
   .day-status { font-size: 9px; }
   .legend { padding: 6px 8px; gap: 6px; }
