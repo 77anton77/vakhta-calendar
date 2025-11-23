@@ -79,7 +79,7 @@ function renderYearView() {
   yearContainer.style.gridColumn = '1 / -1';
 
   for (let month = 0; month < 12; month++) {
-    yearContainer.appendChild(createMonthOverview(month));
+    yearContainer.appendChild((month));
   }
   calendarEl.appendChild(yearContainer);
 }
@@ -125,7 +125,31 @@ function fitMonthRows() {
 function createMonthOverview(month) {
   const monthEl = document.createElement('div');
   monthEl.className = 'month-overview';
-  monthEl.addEventListener('click', () => {
+
+  // Блокируем системный зум по двойному клику/двойному тапу ТОЛЬКО на мини‑месяцах
+  let lastTap = 0;
+
+  // dblclick (эмулятор/десктоп)
+  monthEl.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, { passive: false });
+
+  // двойной тап (мобильный WebView/эмулятор)
+  monthEl.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      // второй тап подряд — гасим, чтобы не было зума
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    lastTap = now;
+  }, { passive: false });
+
+  // Переход к месяцу
+  monthEl.addEventListener('click', (e) => {
+    e.preventDefault(); // на всякий случай — убрать нативные side‑эффекты
     currentDate.setMonth(month);
     currentView = 'month';
     saveData();
@@ -145,6 +169,7 @@ function createMonthOverview(month) {
   `;
   return monthEl;
 }
+
 
 function generateMonthDays(month) {
   const year = currentDate.getFullYear();
@@ -2035,6 +2060,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
