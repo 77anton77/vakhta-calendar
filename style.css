@@ -4,7 +4,19 @@ html { -webkit-text-size-adjust: 100%; }
 
 /* ========== LAYOUT ========== */
 body { background: linear-gradient(135deg, #1e3c72, #2a5298); color: #333; min-height: 100vh; padding: 10px; }
-.container { max-width: 1400px; margin: 0 auto; background: rgba(255,255,255,0.95); border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; height: calc(100vh - 20px); }
+
+/* ВАЖНО: не клипуем содержимое, чтобы правые колонки не "резались" */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.95);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  overflow: visible;                /* было hidden — из-за него "съедались" правые ячейки */
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 20px);
+}
 
 /* ========== HEADER ========== */
 header { background: linear-gradient(135deg, #2c3e50, #3498db); color: #fff; padding: 18px; text-align: center; flex-shrink: 0; }
@@ -24,38 +36,66 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
 .actions button.active { background: #27ae60; box-shadow: 0 0 5px rgba(39,174,96,.5); }
 
 /* ========== CALENDAR (MONTH VIEW) ========== */
-.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #bdc3c7; padding: 2px; border-radius: 8px; flex-grow: 1; min-height: 0; overflow-y: auto; }
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  background: #bdc3c7;
+  padding: 2px;
+  border-radius: 8px;
+  flex-grow: 1;
+  min-height: 0;
+  overflow-y: auto;                 /* вертикальный скролл */
+  overflow-x: visible;              /* ВАЖНО: ничего не обрезаем по горизонтали */
+}
 
-/* Заголовки дней недели: компактные и sticky, но не обрезаются */
+/* Заголовки дней недели: компактные и sticky */
 .day-header {
   position: sticky; top: 0; z-index: 5;
   background: #2c3e50; color: #fff;
-  padding: 7px 4px;              /* +1px к высоте против прошлой версии, чтобы ничего не резалось */
-  font-size: 11px;               /* компактно, но читаемо */
-  line-height: 1.05;             /* предотвращает “съедание” по вертикали */
+  padding: 7px 4px;
+  font-size: 11px; line-height: 1.05;
   text-align: center; font-weight: 600;
   box-shadow: 0 1px 0 rgba(0,0,0,.08);
 }
 
 /* ========== DAY CELL ========== */
-.day { background: #fff; min-height: 100px; padding: 8px; display: flex; flex-direction: column; position: relative; transition: all .3s; border-radius: 4px; border: 1px solid #e9ecef; }
-.day:hover {
+.day {
+  background: #fff;
+  min-height: 100px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all .2s;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+/* Эффект hover — только на устройствах с мышью (чтобы на таче ничего не "съедалось") */
+@media (hover: hover) and (pointer: fine) {
+  .day:hover {
     transform: scale(1.02);
     z-index: 1;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 5px 15px rgba(0,0,0,.1);
     border-color: #3498db;
+  }
+}
+/* На сенсорных — без масштабирования и лишних теней, чтобы ничего не клиповалось */
+@media (hover: none), (pointer: coarse) {
+  .day:hover { transform: none; box-shadow: none; }
 }
 
 .day-number { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
 .day-status { font-size: 12px; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 4px; padding: 3px; }
 
-/* Визуально отделяем “чужие” дни месяца */
+/* Чужие дни месяца — визуально слабее (но кликабельны) */
 .other-month { opacity: .55; }
 
-/* Лёгкий фон “сегодня” */
+/* Лёгкий фон “сегодня” (основной акцент ниже, в :root) */
 .today { background: #fff3cd; }
 
-/* ========== STATUS COLORS ========== */
+/* ========== STATUS COLORS (MONTH) ========== */
 .status-work-day { background: #ff6b6b; color: #fff; }
 .status-work-night { background: #9b59b6; color: #fff; }
 .status-travel-to { background: linear-gradient(to right, #3498db 50%, #ff6b6b 50%); color: #fff; }
@@ -72,7 +112,7 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
 
 /* Подсветка диапазона */
 .day.range-selected { outline: 2px solid #e67e22; box-shadow: inset 0 0 8px rgba(230,126,34,.4); position: relative; }
-.day.range-selected::after { content: ""; position: absolute; inset: 0; background: rgba(230,126,34,.12); border-radius: 4px; pointer-events: none; }
+.day.range-selected::after { content:""; position:absolute; inset:0; background: rgba(230,126,34,.12); border-radius:4px; pointer-events:none; }
 
 /* ========== LEGEND ========== */
 .legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 10px; background: #f8f9fa; border-top: 1px solid #e9ecef; justify-content: center; flex-shrink: 0; }
@@ -82,25 +122,29 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
 /* ========== YEAR VIEW (скролл, без масштабирования) ========== */
 .calendar.year-mode { display: flex; flex-direction: column; overflow: auto; }
 .calendar.year-mode .day-header { display: none !important; }
+
 .calendar .year-view {
   grid-column: 1 / -1; width: 100%; height: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); /* десктоп/широкие */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   grid-auto-rows: minmax(180px, auto);
   gap: 12px; padding: 12px; background: #fff; box-sizing: border-box;
 }
+
 .month-overview { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; background: #fff; cursor: pointer; transition: all .2s; display: flex; flex-direction: column; min-height: 0; }
 .month-overview:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); border-color: #3498db; }
+
 .month-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
 .month-name { font-weight: bold; font-size: 14px; color: #2c3e50; text-transform: lowercase; }
 .month-stats { font-size: 11px; color: #7f8c8d; background: #f8f9fa; padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+
 .month-days-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(6, 1fr); gap: 2px; width: 100%; flex: 1 1 auto; min-height: 0; }
 .month-day { width: 100%; height: 100%; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; position: relative; border: 1px solid rgba(255,255,255,.3); color: #fff; font-weight: bold; box-sizing: border-box; }
 .month-day.empty { background: transparent; border: none; }
 .month-day .day-number { font-weight: bold; line-height: 1; font-size: 9px; }
 .month-day .day-symbol { font-size: 7px; line-height: 1; margin-top: 1px; }
 
-/* ========== СЕГОДНЯ (рамка/метка/затемнение — в :root) ========== */
+/* ========== СЕГОДНЯ (рамка/метка/затемнение — настраивается переменными) ========== */
 :root {
   --today-ring: #000; --today-dot: #000; --today-dot-halo: #fff;
   --today-ring-month-w: 4px; --today-ring-year-w: 2px;
@@ -130,11 +174,13 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
 @media (max-width: 1200px) {
   .calendar .year-view { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); grid-auto-rows: minmax(170px, auto); }
 }
+
 @media (max-width: 768px) {
   .controls { flex-direction: column; gap: 10px; }
   .date-controls, .actions { justify-content: center; }
 }
-/* КЛЮЧЕВОЕ: на узких — два столбца в годовом виде, чтобы “как раньше” */
+
+/* Мобильная компоновка: кнопки в две колонки, компактная шапка, ничего не обрезается */
 @media (max-width: 480px) {
   header { padding: 6px 8px; } h1 { font-size: 18px; }
   .controls { padding: 6px 8px; gap: 6px; }
@@ -162,10 +208,9 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
 
   .actions button { width: 100%; min-height: 28px; font-size: 10.5px; padding: 5px 7px; white-space: normal; line-height: 1.2; }
 
-  /* ВАЖНО: вернуть 2 столбца месяцев в годовом виде на телефонах */
   .calendar.year-mode { overflow: auto; }
   .calendar .year-view {
-    grid-template-columns: repeat(2, minmax(160px, 1fr)); /* два столбца, как раньше */
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
     grid-auto-rows: minmax(140px, auto);
     gap: 6px; padding: 6px;
   }
@@ -178,7 +223,6 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .month-day .day-number { font-size: 8px; }
   .month-day .day-symbol { display: none; }
 
-  /* Заголовок дней недели на телефонах — ещё компактнее, но без “обрезания” */
   .day-header { padding: 6px 3px; font-size: 10px; line-height: 1.05; }
 
   .day { min-height: 50px; padding: 3px; }
@@ -187,28 +231,6 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .legend-item { font-size: 11px; }
   footer { padding: 6px; font-size: 11px; }
 }
-/* Небольшая заметка под статусом */
-.day-note {
-  margin-top: 4px;
-  font-size: 10px;
-  line-height: 1.2;
-  color: #6b7280;
-  word-break: break-word;
-  overflow-wrap: anywhere; /* на всякий */
-  white-space: normal;
-}
-
-/* Если показываем ТОЛЬКО заметку вместо "Командировка" */
-.day-note-only {
-  margin-top: 0;            /* без лишнего отступа, т.к. нет заголовка */
-  text-align: center;
-}
-
-/* на мобильных сделать чуть меньше шрифт */
-@media (max-width: 480px) {
-  .day-note { font-size: 9px; }
-}
-
 
 /* ========== PRINT ========== */
 @media print {
@@ -228,5 +250,3 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
 /* Скрыть ТОЛЬКО месячную навигацию в годовом виде (оставить «Год» кнопки и год по центру) */
 .controls.hide-month-nav #prev-month,
 .controls.hide-month-nav #next-month { display: none !important; }
-
-
