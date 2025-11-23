@@ -392,7 +392,7 @@ function setupEventListeners() {
   document.getElementById('today').addEventListener('click', () => { currentDate = new Date(); renderCalendar(); });
 
   const shareBtn = document.getElementById('share');
-  if (shareBtn) shareBtn.addEventListener('click', openShareModal);
+  if (shareBtn) shareBtn.addEventListener('click', );
 
   document.getElementById('set-vakhta').addEventListener('click', setVakhtaStartDate);
   document.getElementById('show-stats').addEventListener('click', showStatistics);
@@ -1852,7 +1852,7 @@ function openShareModal() {
   const fullCode  = buildExportCode(true);
 
   modal.innerHTML = `
-    <div style="background:#fff; padding:16px; border-radius:10px; width:92%; max-width:560px;">
+    <div id="share-content" style="background:#fff; padding:16px; border-radius:10px; width:92%; max-width:560px; filter:none;">
       <h3 style="text-align:center; margin-bottom:12px;">Поделиться / Экспорт · Импорт</h3>
 
       <div style="display:flex; flex-direction:column; gap:14px;">
@@ -1881,6 +1881,21 @@ function openShareModal() {
           </div>
         </div>
 
+        
+        <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+          <div style="font-weight:600; margin-bottom:8px;">Импорт</div>
+          <textarea id="import-code" placeholder="Вставьте код здесь" style="width:100%; height:80px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+              <input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+              <input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)
+            </label>
+            <button id="apply-import" style="margin-left:auto; padding:8px 10px; background:#3498db; color:#fff; border:none; border-radius:6px;">Импортировать</button>
+          </div>
+        </div>
+
         <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
           <div style="font-weight:600; margin-bottom:8px;">Печать</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1902,33 +1917,23 @@ function openShareModal() {
     </div>
   `;
   document.body.appendChild(modal);
-  // Безопасные обработчики закрытия — навешиваем СРАЗУ
-const safeClose = () => {
-  try { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); } catch {}
-};
 
-// Клик по фону — закрыть
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) safeClose();
-});
+  // Безопасное закрытие — сразу
+  const safeClose = () => { try { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); } catch {} };
+  modal.addEventListener('click', (e) => { if (e.target === modal) safeClose(); });
+  const closeBtn = modal.querySelector('#close-share');
+  if (closeBtn) closeBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); safeClose(); });
 
-// Кнопка "Закрыть" — закрыть (и не пускать событие наверх)
-const closeBtn = modal.querySelector('#close-share');
-if (closeBtn) {
-  closeBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    safeClose();
-  });
-}
-
-
-  const content = modal.firstElementChild;
+  // Контент: прокрутка/чёткость
+  const content = modal.querySelector('#share-content');
   if (content) {
     content.style.maxHeight = '85vh';
     content.style.overflowY = 'auto';
+    content.style.filter = 'none';           // на всякий случай
+    content.style.backdropFilter = 'none';   // убрать любые размытия
   }
 
+  // Копирование
   const basicCopied = modal.querySelector('#basic-copied');
   modal.querySelector('#copy-basic').addEventListener('click', () => {
     const ta = modal.querySelector('#export-basic');
@@ -1946,6 +1951,7 @@ if (closeBtn) {
     });
   });
 
+  // Импорт (теперь элементы существуют)
   modal.querySelector('#apply-import').addEventListener('click', () => {
     const code = modal.querySelector('#import-code').value.trim();
     if (!code) { alert('Вставьте код для импорта'); return; }
@@ -1960,42 +1966,27 @@ if (closeBtn) {
         const d = parseYMDLocal(obj.vakhtaStartDate);
         if (!isNaN(d)) vakhtaStartDate = d;
       }
-      if (obj.currentSchedule) {
-        currentSchedule = obj.currentSchedule;
-      }
+      if (obj.currentSchedule) currentSchedule = obj.currentSchedule;
     };
     if (mode === 'basic') {
       applyBasic();
     } else {
       applyBasic();
-      if (obj.manualOverrides && typeof obj.manualOverrides === 'object') {
-        manualOverrides = obj.manualOverrides;
-      } else {
-        manualOverrides = {};
-      }
-      if (obj.manualNotes && typeof obj.manualNotes === 'object') {
-        manualNotes = obj.manualNotes;
-      } else {
-        manualNotes = {};
-      }
+      manualOverrides = (obj.manualOverrides && typeof obj.manualOverrides === 'object') ? obj.manualOverrides : {};
+      manualNotes     = (obj.manualNotes     && typeof obj.manualNotes     === 'object') ? obj.manualNotes     : {};
     }
     saveData();
     renderCalendar();
     alert('Импорт завершён');
-    document.body.removeChild(modal);
+    safeClose();
     queueTgSync('import');
   });
 
-  modal.querySelector('#print-month').addEventListener('click', () => {
-    document.body.removeChild(modal);
-    tryPrint('month');
-  });
-  modal.querySelector('#print-year').addEventListener('click', () => {
-    document.body.removeChild(modal);
-    tryPrint('year');
-  });
-
+  // Печать
+  modal.querySelector('#print-month').addEventListener('click', () => { safeClose(); tryPrint('month'); });
+  modal.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
 }
+
 
 // ========================
 // Автосинхронизация в Telegram Bot (через WebApp.sendData) + тест‑кнопка
@@ -2043,6 +2034,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
