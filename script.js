@@ -993,6 +993,35 @@ function getDateStringsBetween(a, b) {
   }
   return arr;
 }
+function findDayCellAtClientPoint(x, y) {
+  const cal = document.getElementById('calendar');
+  if (!cal) return null;
+  const r = cal.getBoundingClientRect();
+  // Зажимаем координату внутрь календаря, чтобы не уходить в зазоры/радиусы
+  const xi = Math.min(r.right - 1, Math.max(r.left + 1, x));
+  const yi = Math.min(r.bottom - 1, Math.max(r.top + 1, y));
+
+  let node = document.elementFromPoint(xi, yi);
+  let dayEl = node && node.closest ? node.closest('.day') : null;
+  if (dayEl) return dayEl;
+
+  // Сначала горизонтальные нуджи (чтобы не прыгать на другую строку)
+  const hOffsets = [-1, 1, -3, 3, -5, 5, -7, 7];
+  for (const dx of hOffsets) {
+    node = document.elementFromPoint(xi + dx, yi);
+    dayEl = node && node.closest ? node.closest('.day') : null;
+    if (dayEl) return dayEl;
+  }
+
+  // Как запасной вариант — небольшие вертикальные нуджи
+  for (const dy of [-3, 3, -5, 5]) {
+    node = document.elementFromPoint(xi, yi + dy);
+    dayEl = node && node.closest ? node.closest('.day') : null;
+    if (dayEl) return dayEl;
+  }
+
+  return null;
+}
 
 // ========================
 // Свайпы (месяц/год) — при рисовании диапазона отключены
@@ -1909,5 +1938,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
