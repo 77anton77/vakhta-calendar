@@ -689,48 +689,53 @@ function addDayTouchHandlers(el) {
   let startRowIdx = null;
 
   el.addEventListener('touchstart', (e) => {
-    if (currentView !== 'month') return;
+  if (currentView !== 'month') return;
 
-    // Снимем старый диапазон, если был
-    if (selectionEls && selectionEls.size) {
-      clearSelectionHighlight();
-    }
+  // Снимем старый диапазон, если был
+  if (selectionEls && selectionEls.size) {
+    clearSelectionHighlight();
+  }
 
-    const ds = e.currentTarget.getAttribute('data-date');
-    if (!ds) return;
+  const t = e.touches && e.touches[0];
+  if (!t) return;
 
-    tapTargetDateStr = ds;
-    moved = false;
-    touchStartTime = Date.now();
-    lastHoverDs = ds; // на старте уже есть валидная дата
+  // Запоминаем момент и начальные координаты
+  touchStartTime = Date.now();
+  moved = false;
+  startX = t.clientX;
+  startY = t.clientY;
 
-    // НОВОЕ: вычислим строку (неделю) ячейки, с которой началось выделение
-    const daysList = document.querySelectorAll('#calendar > .day');
-    let startIndex = -1;
-    for (let i = 0; i < daysList.length; i++) {
-      if (daysList[i] === e.currentTarget) { startIndex = i; break; }
-    }
-    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
+  // КРИТИЧЕСКОЕ: берём ячейку именно под пальцем, а не e.currentTarget
+  const hitEl = findDayCellAtClientPoint(t.clientX, t.clientY, null) || e.currentTarget;
+  const ds = hitEl && hitEl.getAttribute('data-date');
+  if (!ds) return;
 
-    const t = e.touches[0];
-    if (!t) return;
-    startX = t.clientX;
-    startY = t.clientY;
+  tapTargetDateStr = ds;
+  lastHoverDs = ds; // на старте уже есть валидная дата
 
-    if (longPressTimer) clearTimeout(longPressTimer);
-    selecting = false;
-    selectionStartDate = new Date(ds);
-    selectionEndDate = new Date(ds);
+  // Определим строку (неделю), где началось выделение — приоритет той же строки
+  const daysList = document.querySelectorAll('#calendar > .day'); // 42 клетки
+  let startIndex = -1;
+  for (let i = 0; i < daysList.length; i++) {
+    if (daysList[i] === hitEl) { startIndex = i; break; }
+  }
+  startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
 
-    // long-press стартует выделение
-    longPressTimer = setTimeout(() => {
-      if (moved) return;
-      selecting = true;
-      disableSwipe = true;
-      document.body.classList.add('range-selecting');
-      updateSelectionHighlight();
-    }, LONG_PRESS_MS);
-  }, { passive: true });
+  if (longPressTimer) clearTimeout(longPressTimer);
+  selecting = false;
+  selectionStartDate = new Date(ds);
+  selectionEndDate = new Date(ds);
+
+  // long-press — включаем выбор
+  longPressTimer = setTimeout(() => {
+    if (moved) return;
+    selecting = true;
+    disableSwipe = true;
+    document.body.classList.add('range-selecting');
+    updateSelectionHighlight();
+  }, LONG_PRESS_MS);
+}, { passive: true });
+
 
   el.addEventListener('touchmove', (e) => {
     if (!tapTargetDateStr) return;
@@ -1993,5 +1998,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
