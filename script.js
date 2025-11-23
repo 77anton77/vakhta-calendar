@@ -273,6 +273,18 @@ function getStatusColor(st) {
   };
   return c[st] || '#bdc3c7';
 }
+function escapeHtml(s) {
+  try {
+    return String(s).replace(/[&<>"']/g, ch => (
+      ch === '&' ? '&amp;' :
+      ch === '<' ? '&lt;'  :
+      ch === '>' ? '&gt;'  :
+      ch === '"' ? '&quot;': '&#39;'
+    ));
+  } catch {
+    return '';
+  }
+}
 
 // Рабочие статусы для подсчёта/мини‑месяцев
 function isWorkStatus(st) {
@@ -2013,6 +2025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
