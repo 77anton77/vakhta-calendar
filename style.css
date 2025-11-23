@@ -222,3 +222,4 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
 /* Скрыть ТОЛЬКО месячную навигацию в годовом виде (оставить «Год» кнопки и год по центру) */
 .controls.hide-month-nav #prev-month,
 .controls.hide-month-nav #next-month { display: none !important; }
+
