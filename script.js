@@ -165,29 +165,22 @@ function generateMonthDays(month) {
     const cls = `month-day ${isToday ? 'today' : ''}`;
     const sym = getStatusSymbol(status);
 
-    // Две половинки под текстом (z-index:0)
-    let halvesHtml = '';
+    // Цвет фона через градиент/цвет (без абсолютных слоёв)
+    let bg = '';
     if (status === 'travel-to') {
-      halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;z-index:0;"></div>`;
+      bg = 'background: linear-gradient(to right, #3498db 50%, #ff6b6b 50%);';
     } else if (status === 'travel-from') {
-      halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#9b59b6;pointer-events:none;z-index:0;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>`;
+      bg = 'background: linear-gradient(to right, #9b59b6 50%, #3498db 50%);';
     } else if (status === 'travel-from-day') {
-      halvesHtml = `
-        <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#ff6b6b;pointer-events:none;z-index:0;"></div>
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:50%;background:#3498db;pointer-events:none;z-index:0;"></div>`;
+      bg = 'background: linear-gradient(to right, #ff6b6b 50%, #3498db 50%);';
+    } else {
+      bg = `background:${getStatusColor(status)};`;
     }
 
-    const baseBg = (halvesHtml ? '' : `background:${getStatusColor(status)};`);
-
     html += `
-      <div class="${cls}" style="${baseBg}" title="${d} ${monthNameRu(month)} - ${getStatusText(status)}">
-        ${halvesHtml}
-        <div class="day-number" style="position:relative;z-index:1;">${d}</div>
-        ${sym ? `<div class="day-symbol" style="position:relative;z-index:1;">${sym}</div>` : ''}
+      <div class="${cls}" style="${bg}" title="${d} ${monthNameRu(month)} - ${getStatusText(status)}">
+        <div class="day-number">${d}</div>
+        ${sym ? `<div class="day-symbol">${sym}</div>` : ''}
       </div>
     `;
   }
@@ -201,6 +194,7 @@ function generateMonthDays(month) {
 
   return html;
 }
+
 
 function getMonthStats(month) {
   const year = currentDate.getFullYear();
@@ -1915,3 +1909,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
