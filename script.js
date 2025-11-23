@@ -836,6 +836,72 @@ function addDayTouchHandlers(el) {
     tapTargetDateStr = null;
   });
 }
+// Свайпы (месяц/год) — при рисовании диапазона отключены
+function setupSwipeNavigation() {
+  const cal = document.getElementById('calendar');
+  if (!cal || cal.dataset.swipeAttached === '1') return;
+  cal.dataset.swipeAttached = '1';
+
+  const SWIPE_X = 50, SWIPE_Y = 30;
+
+  let swipeTracking = false;
+  let swipeStartX = 0, swipeStartY = 0;
+  let swipeConsumed = false;
+
+  cal.addEventListener('touchstart', (e) => {
+    if (disableSwipe) return;
+    if (currentView !== 'month' && currentView !== 'year') return;
+    if (e.touches.length !== 1) return;
+    swipeTracking = true;
+    swipeConsumed = false;
+    const t = e.touches[0];
+    swipeStartX = t.clientX;
+    swipeStartY = t.clientY;
+  }, { passive: true });
+
+  cal.addEventListener('touchmove', (e) => {
+    if (disableSwipe) return;
+    if (!swipeTracking) return;
+    const t = e.touches[0];
+    if (!t) return;
+    const dx = t.clientX - swipeStartX;
+    const dy = t.clientY - swipeStartY;
+    if (!swipeConsumed && Math.abs(dx) > SWIPE_X && Math.abs(dy) < SWIPE_Y) {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      selecting = false;
+      swipeConsumed = true;
+      if (e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
+
+  cal.addEventListener('touchend', (e) => {
+    if (disableSwipe) return;
+    if (!swipeTracking) return;
+    swipeTracking = false;
+    if (swipeConsumed) {
+      const touch = e.changedTouches && e.changedTouches[0];
+      const endX = touch ? touch.clientX : swipeStartX;
+      const dx = endX - swipeStartX;
+      if (Math.abs(dx) >= SWIPE_X) {
+        if (dx < 0) {
+          if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() + 1);
+          else currentDate.setFullYear(currentDate.getFullYear() + 1);
+        } else {
+          if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() - 1);
+          else currentDate.setFullYear(currentDate.getFullYear() - 1);
+        }
+        renderCalendar();
+      }
+      if (e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
+
+  cal.addEventListener('touchcancel', () => {
+    if (disableSwipe) return;
+    swipeTracking = false;
+    swipeConsumed = false;
+  });
+}
 
 function setupMouseRangeSelection() {
   document.addEventListener('mousedown', (e) => {
@@ -1886,3 +1952,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
