@@ -681,11 +681,17 @@ function addDayTouchHandlers(el) {
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
-  let lastHoverDs = null; // фолбэк на случай отрыва пальца над «зазором»
+
+  // НОВОЕ: запоминаем последнюю валидную дату под пальцем (на случай отрыва в "зазоре")
+  let lastHoverDs = null;
+
+  // НОВОЕ: приоритет строки — номер недели (0..5), где началось выделение
+  let startRowIdx = null;
 
   el.addEventListener('touchstart', (e) => {
     if (currentView !== 'month') return;
 
+    // Снимем старый диапазон, если был
     if (selectionEls && selectionEls.size) {
       clearSelectionHighlight();
     }
@@ -696,6 +702,15 @@ function addDayTouchHandlers(el) {
     tapTargetDateStr = ds;
     moved = false;
     touchStartTime = Date.now();
+    lastHoverDs = ds; // на старте уже есть валидная дата
+
+    // НОВОЕ: вычислим строку (неделю) ячейки, с которой началось выделение
+    const daysList = document.querySelectorAll('#calendar > .day');
+    let startIndex = -1;
+    for (let i = 0; i < daysList.length; i++) {
+      if (daysList[i] === e.currentTarget) { startIndex = i; break; }
+    }
+    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
 
     const t = e.touches[0];
     if (!t) return;
@@ -706,8 +721,8 @@ function addDayTouchHandlers(el) {
     selecting = false;
     selectionStartDate = new Date(ds);
     selectionEndDate = new Date(ds);
-    lastHoverDs = ds;
 
+    // long-press стартует выделение
     longPressTimer = setTimeout(() => {
       if (moved) return;
       selecting = true;
@@ -725,6 +740,7 @@ function addDayTouchHandlers(el) {
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
+    // До старта выделения отменяем long-press только при явном вертикальном скролле
     if (!selecting) {
       const dist = Math.hypot(dx, dy);
       if (dist > MOVE_CANCEL_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -733,12 +749,14 @@ function addDayTouchHandlers(el) {
       }
     }
 
+    // Уже рисуем диапазон — уточняем конечную дату
     if (selecting) {
-      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
+      // НОВОЕ: передаём приоритет строки старта
+      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
       const ds = dayEl && dayEl.getAttribute('data-date');
       if (ds) {
         selectionEndDate = new Date(ds);
-        lastHoverDs = ds;
+        lastHoverDs = ds; // запомним последнюю валидную дату
         updateSelectionHighlight();
         if (e && e.cancelable) e.preventDefault();
       }
@@ -748,11 +766,13 @@ function addDayTouchHandlers(el) {
   const finish = (e) => {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
+    // На завершении уточним конечную дату
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
-      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
+      // НОВОЕ: используем приоритет строки старта
+      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
       let ds = dayEl && dayEl.getAttribute('data-date');
-      if (!ds && lastHoverDs) ds = lastHoverDs; // фолбэк, если палец оторвался «мимо» ячейки
+      if (!ds && lastHoverDs) ds = lastHoverDs; // фолбэк, если палец оторвался “в зазоре”
       if (ds) selectionEndDate = new Date(ds);
     }
 
@@ -774,6 +794,7 @@ function addDayTouchHandlers(el) {
         }
       }
     } else {
+      // Обычный тап/двойной тап
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
@@ -812,6 +833,7 @@ function addDayTouchHandlers(el) {
     tapTargetDateStr = null;
   });
 }
+
 
 function setupMouseRangeSelection() {
   document.addEventListener('mousedown', (e) => {
@@ -995,12 +1017,12 @@ function getDateStringsBetween(a, b) {
 }
 
 // Поиск ячейки под пальцем с «липкими» оффсетами (фикс правых краёв — воскресенье)
-function findDayCellAtClientPoint(x, y) {
+function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) {
   const cal = document.getElementById('calendar');
   if (!cal) return null;
   const r = cal.getBoundingClientRect();
 
-  // Зажимаем координату внутрь календаря (чуть отступив от краёв)
+  // Чуть внутрь от краёв контейнера
   const xi = Math.min(r.right - 2, Math.max(r.left + 2, x));
   const yi = Math.min(r.bottom - 2, Math.max(r.top + 2, y));
 
@@ -1009,43 +1031,51 @@ function findDayCellAtClientPoint(x, y) {
     return n && n.closest ? n.closest('.day') : null;
   };
 
-  // 1) Прямое попадание
+  // 1) Прямо под пальцем
   let el = probe(xi, yi);
   if (el) return el;
 
-  // 2) Вся “стопка” под точкой (если поддерживается)
+  // 2) Вся "стопка" под точкой
   if (document.elementsFromPoint) {
     const stack = document.elementsFromPoint(xi, yi);
     el = stack.find(n => n && n.classList && n.classList.contains('day'));
     if (el) return el;
   }
 
-  // 3) Горизонтальные «тычки» (приоритет — по горизонтали, чтобы не прыгать между строками)
-  const H = [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
+  // 3) Горизонтальные "тычки"
+  const H = [1,2,3,4,6,8,10,12,14,16,18,20,24];
   for (const d of H) {
     el = probe(xi - d, yi) || probe(xi + d, yi);
     if (el) return el;
   }
 
   // 4) Небольшие вертикальные сдвиги
-  for (const d of [3, 5, 7, 9, 12]) {
+  for (const d of [3,5,7,9,12]) {
     el = probe(xi, yi - d) || probe(xi, yi + d);
     if (el) return el;
   }
 
-  // 5) Крайний фолбэк: берём ближайшую .day по центрам прямоугольников
-  const days = cal.querySelectorAll(':scope > .day');
+  // 5) Крайний фолбэк: ближайшая .day по центрам, но с приоритетом той же строки (недели)
+  const days = cal.querySelectorAll(':scope > .day'); // 42 клетки месяца
   let best = null, bestScore = Infinity;
-  days.forEach(cell => {
+
+  for (let i = 0; i < days.length; i++) {
+    const cell = days[i];
     const cr = cell.getBoundingClientRect();
     const cx = (cr.left + cr.right) / 2;
     const cy = (cr.top + cr.bottom) / 2;
-    // даём больший вес вертикальному ряду, чтобы держаться той же строки
-    const score = Math.abs(yi - cy) * 2 + Math.abs(xi - cx);
+
+    const row = Math.floor(i / 7); // строка 0..5
+    const rowPenalty = (preferredRowIdx != null && row !== preferredRowIdx) ? 10000 : 0;
+
+    // Больше вес вертикали, чтобы держаться той же строки
+    const score = rowPenalty + Math.abs(yi - cy) * 2 + Math.abs(xi - cx);
+
     if (score < bestScore) { bestScore = score; best = cell; }
-  });
+  }
   return best;
 }
+
 
 
 // ========================
@@ -1963,4 +1993,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
