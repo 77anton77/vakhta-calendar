@@ -222,6 +222,15 @@ function parseYMDLocal(s) {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
+// Рабочие статусы для подсчёта/мини‑месяцев
+function isWorkStatus(st) {
+  return ['travel-to','work-day','work-night','travel-from','travel-from-day'].includes(st);
+}
+
+// Специальные статусы (не отдых и не работа)
+function isSpecialStatus(st) {
+  return ['sick','business-trip','vacation'].includes(st);
+}
 
 // ========================
 // Данные
@@ -1952,4 +1961,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
