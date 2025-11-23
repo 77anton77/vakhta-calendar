@@ -687,7 +687,9 @@ function addDayTouchHandlers(el) {
     if (currentView !== 'month') return;
 
     // если был старый диапазон — снимем
-    if (selectionEls && selectionEls.size) clearSelectionHighlight();
+    if (selectionEls && selectionEls.size) {
+      clearSelectionHighlight();
+    }
 
     const ds = e.currentTarget.getAttribute('data-date');
     if (!ds) return;
@@ -724,7 +726,7 @@ function addDayTouchHandlers(el) {
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
-    // Отменяем long-press до старта выбора только при ЯВНОМ вертикальном скролле
+    // Отменяем long-press до старта выбора только при явном вертикальном скролле
     if (!selecting) {
       const dist = Math.hypot(dx, dy);
       if (dist > MOVE_CANCEL_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -733,14 +735,14 @@ function addDayTouchHandlers(el) {
       }
     }
 
+    // Если уже рисуем диапазон — обновляем конечную дату под пальцем (с безопасным подбором)
     if (selecting) {
-      const node = document.elementFromPoint(t.clientX, t.clientY);
-      const dayEl = node && node.closest ? node.closest('.day') : null;
+      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
       const ds = dayEl && dayEl.getAttribute('data-date');
       if (ds) {
         selectionEndDate = new Date(ds);
         updateSelectionHighlight();
-        e.preventDefault();
+        if (e && e.cancelable) e.preventDefault();
       }
     }
   }, { passive: false });
@@ -748,10 +750,10 @@ function addDayTouchHandlers(el) {
   const finish = (e) => {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
+    // Если рисовали диапазон — уточним конечную дату под пальцем
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
-      const node = document.elementFromPoint(t.clientX, t.clientY);
-      const dayEl = node && node.closest ? node.closest('.day') : null;
+      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
       const ds = dayEl && dayEl.getAttribute('data-date');
       if (ds) selectionEndDate = new Date(ds);
     }
@@ -760,7 +762,7 @@ function addDayTouchHandlers(el) {
       selecting = false;
       document.body.classList.remove('range-selecting');
       disableSwipe = false;
-      e && e.preventDefault();
+      if (e && e.cancelable) e.preventDefault();
 
       const picked = getDateStringsBetween(selectionStartDate, selectionEndDate);
 
@@ -774,10 +776,11 @@ function addDayTouchHandlers(el) {
         }
       }
     } else {
+      // Обычный тап/двойной — только если не было движения
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
-          e && e.preventDefault();
+          if (e && e.cancelable) e.preventDefault();
           editDayManually(new Date(tapTargetDateStr));
         } else {
           const now = Date.now();
@@ -785,7 +788,7 @@ function addDayTouchHandlers(el) {
           const timeOk = (now - lastTapTime) < 280;
           const dist = Math.hypot(startX - lastTapX, startY - lastTapY);
           if (same && timeOk && dist < 12) {
-            e && e.preventDefault();
+            if (e && e.cancelable) e.preventDefault();
             editDayManually(new Date(tapTargetDateStr));
             lastTapTime = 0; lastTapDateStr = null;
           } else {
@@ -799,6 +802,20 @@ function addDayTouchHandlers(el) {
 
     tapTargetDateStr = null;
   };
+
+  el.addEventListener('touchend', finish, { passive: false });
+  el.addEventListener('touchcancel', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    if (selecting) {
+      selecting = false;
+      document.body.classList.remove('range-selecting');
+      clearSelectionHighlight();
+    }
+    disableSwipe = false;
+    tapTargetDateStr = null;
+  });
+}
+
 
   el.addEventListener('touchend', finish, { passive: false });
   el.addEventListener('touchcancel', () => {
@@ -1938,6 +1955,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
