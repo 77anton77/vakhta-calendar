@@ -69,20 +69,30 @@ function renderYearView() {
   const calendarEl = document.getElementById('calendar');
   const currentMonthEl = document.getElementById('current-month');
 
+  // очищаем сетку, оставляя 7 заголовков дней
   while (calendarEl.children.length > 7) {
     calendarEl.removeChild(calendarEl.lastChild);
   }
+
+  // в заголовке показываем год
   currentMonthEl.textContent = currentDate.getFullYear();
 
+  // контейнер годового вида
   const yearContainer = document.createElement('div');
   yearContainer.className = 'year-view';
   yearContainer.style.gridColumn = '1 / -1';
 
+  // добавляем 12 мини-месяцев
   for (let month = 0; month < 12; month++) {
-    yearContainer.appendChild((month));
+    const mini = createMonthOverview(month);
+    if (mini && mini.nodeType === 1) {
+      yearContainer.appendChild(mini);
+    }
   }
+
   calendarEl.appendChild(yearContainer);
 }
+
 
 // ========================
 // Месячный вид: подгоняем высоту ячеек
@@ -2060,6 +2070,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
