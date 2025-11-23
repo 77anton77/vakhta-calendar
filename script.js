@@ -165,6 +165,7 @@ function generateMonthDays(month) {
     const cls = `month-day ${isToday ? 'today' : ''}`;
     const sym = getStatusSymbol(status);
 
+    // Цвет фона через градиент/цвет (без абсолютных слоёв)
     let bg = '';
     if (status === 'travel-to') {
       bg = 'background: linear-gradient(to right, #3498db 50%, #ff6b6b 50%);';
@@ -227,9 +228,11 @@ function loadSavedData() {
       if (!isNaN(d)) vakhtaStartDate = d;
     }
     if (data.manualOverrides) manualOverrides = data.manualOverrides;
+
     if (data.manualNotes && typeof data.manualNotes === 'object') {
       manualNotes = data.manualNotes;
     }
+
     if (data.currentView) currentView = data.currentView === 'year' ? 'year' : 'month';
   }
   updateScheduleButtonText();
@@ -258,7 +261,7 @@ function initCalendar() {
   setupSwipeNavigation();
   updateLegendVisibility();
   updateScheduleButtonText();
-  addTgTestButton(); // тест кнопка для TG WebApp
+  addTgTestButton(); // тест‑кнопка в TG WebApp
   processPrintParams();
 }
 
@@ -273,6 +276,7 @@ function initTelegramApp() {
 }
 
 function setupEventListeners() {
+  // Блокируем системное меню "копировать"
   document.addEventListener('contextmenu', (e) => {
     if (e.target.closest && e.target.closest('.calendar')) e.preventDefault();
   });
@@ -346,6 +350,7 @@ function createDayElement(date, isOtherMonth) {
 
   dayEl.className = classes.join(' ');
 
+  // "Командировка" — показываем заметку вместо слова, если есть
   let statusHtml = '';
   if (status === 'business-trip' && manualNotes[dateStr]) {
     statusHtml = `${escapeHtml(manualNotes[dateStr])}`;
@@ -376,7 +381,7 @@ function renderCalendar() {
   if (currentView === 'year') {
     dayHeaders.forEach(h => h.style.display = 'none');
     calendarEl.classList.add('year-mode');
-    if (controls) controls.classList.add('hide-month-nav');
+    if (controls) controls.classList.add('hide-month-nav'); // скрываем только месячные кнопки
     const oldYear = calendarEl.querySelector('.year-view');
     if (oldYear) oldYear.remove();
     renderYearView();
@@ -676,6 +681,7 @@ function addDayTouchHandlers(el) {
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
+  let lastHoverDs = null; // фолбэк на случай отрыва пальца над «зазором»
 
   el.addEventListener('touchstart', (e) => {
     if (currentView !== 'month') return;
@@ -700,6 +706,7 @@ function addDayTouchHandlers(el) {
     selecting = false;
     selectionStartDate = new Date(ds);
     selectionEndDate = new Date(ds);
+    lastHoverDs = ds;
 
     longPressTimer = setTimeout(() => {
       if (moved) return;
@@ -731,6 +738,7 @@ function addDayTouchHandlers(el) {
       const ds = dayEl && dayEl.getAttribute('data-date');
       if (ds) {
         selectionEndDate = new Date(ds);
+        lastHoverDs = ds;
         updateSelectionHighlight();
         if (e && e.cancelable) e.preventDefault();
       }
@@ -743,7 +751,8 @@ function addDayTouchHandlers(el) {
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
       const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY);
-      const ds = dayEl && dayEl.getAttribute('data-date');
+      let ds = dayEl && dayEl.getAttribute('data-date');
+      if (!ds && lastHoverDs) ds = lastHoverDs; // фолбэк, если палец оторвался «мимо» ячейки
       if (ds) selectionEndDate = new Date(ds);
     }
 
@@ -985,28 +994,42 @@ function getDateStringsBetween(a, b) {
   return arr;
 }
 
+// Поиск ячейки под пальцем с «липкими» оффсетами (фикс правых краёв — воскресенье)
 function findDayCellAtClientPoint(x, y) {
   const cal = document.getElementById('calendar');
   if (!cal) return null;
   const r = cal.getBoundingClientRect();
-  const xi = Math.min(r.right - 1, Math.max(r.left + 1, x));
-  const yi = Math.min(r.bottom - 1, Math.max(r.top + 1, y));
 
-  let node = document.elementFromPoint(xi, yi);
-  let dayEl = node && node.closest ? node.closest('.day') : null;
-  if (dayEl) return dayEl;
+  // Зажимаем координату внутрь календаря (чуть дальше от краёв)
+  const xi = Math.min(r.right - 2, Math.max(r.left + 2, x));
+  const yi = Math.min(r.bottom - 2, Math.max(r.top + 2, y));
 
-  const hOffsets = [-1, 1, -3, 3, -5, 5, -7, 7];
-  for (const dx of hOffsets) {
-    node = document.elementFromPoint(xi + dx, yi);
-    dayEl = node && node.closest ? node.closest('.day') : null;
-    if (dayEl) return dayEl;
+  const probe = (px, py) => {
+    const n = document.elementFromPoint(px, py);
+    return n && n.closest ? n.closest('.day') : null;
+  };
+
+  // Прямая точка
+  let el = probe(xi, yi);
+  if (el) return el;
+
+  // Горизонтальные «тычки» (приоритет — по горизонтали)
+  const offs = [1,2,3,4,5,6,8,10,12,14,16,18,20];
+  for (const d of offs) {
+    el = probe(xi - d, yi) || probe(xi + d, yi);
+    if (el) return el;
   }
 
-  for (const dy of [-3, 3, -5, 5]) {
-    node = document.elementFromPoint(xi, yi + dy);
-    dayEl = node && node.closest ? node.closest('.day') : null;
-    if (dayEl) return dayEl;
+  // Небольшие вертикальные смещения
+  for (const d of [3,5,7,9]) {
+    el = probe(xi, yi - d) || probe(xi, yi + d);
+    if (el) return el;
+  }
+
+  // Диагонали — крайний случай
+  for (const d of [4,8,12,16]) {
+    el = probe(xi - d, yi - 2) || probe(xi + d, yi - 2) || probe(xi - d, yi + 2) || probe(xi + d, yi + 2);
+    if (el) return el;
   }
 
   return null;
@@ -1770,6 +1793,20 @@ function openShareModal() {
         </div>
 
         <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+          <div style="font-weight:600; margin-bottom:8px;">Импорт</div>
+          <textarea id="import-code" placeholder="Вставьте код здесь" style="width:100%; height:80px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+              <input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+              <input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)
+            </label>
+            <button id="apply-import" style="margin-left:auto; padding:8px 10px; background:#3498db; color:#fff; border:none; border-radius:6px;">Импортировать</button>
+          </div>
+        </div>
+
+        <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
           <div style="font-weight:600; margin-bottom:8px;">Печать</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="print-month" style="padding:8px 10px; background:#2ecc71; color:#fff; border:none; border-radius:6px;">Печать: текущий месяц</button>
@@ -1886,6 +1923,7 @@ function sendTgSnapshot(reason) {
     if (isTGWebApp()) Telegram.WebApp.sendData(JSON.stringify(envelope));
   } catch {}
 }
+// временная тест‑кнопка (видна только в Telegram WebApp)
 function addTgTestButton() {
   if (!isTGWebApp()) return;
   const actions = document.querySelector('.actions');
