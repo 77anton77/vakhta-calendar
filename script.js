@@ -816,20 +816,6 @@ function addDayTouchHandlers(el) {
   });
 }
 
-
-  el.addEventListener('touchend', finish, { passive: false });
-  el.addEventListener('touchcancel', () => {
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-    if (selecting) {
-      selecting = false;
-      document.body.classList.remove('range-selecting');
-      clearSelectionHighlight();
-    }
-    disableSwipe = false;
-    tapTargetDateStr = null;
-  });
-}
-
 function setupMouseRangeSelection() {
   document.addEventListener('mousedown', (e) => {
     if (currentView !== 'month') return;
@@ -1955,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
