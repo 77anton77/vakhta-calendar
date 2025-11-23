@@ -1026,7 +1026,7 @@ function setupSwipeNavigation() {
       if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
       selecting = false;
       swipeConsumed = true;
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
     }
   }, { passive: false });
 
@@ -1048,7 +1048,7 @@ function setupSwipeNavigation() {
         }
         renderCalendar();
       }
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
     }
   }, { passive: false });
 
@@ -1909,4 +1909,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
