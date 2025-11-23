@@ -222,6 +222,58 @@ function parseYMDLocal(s) {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
+// Сегодня?
+function isTodayDate(d) {
+  const t = new Date();
+  return d.getDate() === t.getDate()
+      && d.getMonth() === t.getMonth()
+      && d.getFullYear() === t.getFullYear();
+}
+
+// Название месяца (для подсказок в годовом виде)
+function monthNameRu(m) {
+  return new Date(currentDate.getFullYear(), m)
+    .toLocaleDateString('ru-RU', { month: 'long' });
+}
+
+// Символы статусов (используются в годовом виде)
+function getStatusSymbol(st) {
+  const map = {
+    'work-day': '☀️',
+    'work-night': '🌙',
+    'travel-to': '➡️',
+    'travel-from': '⬅️',
+    'travel-from-day': '⬅️',
+    'plane-from-home': '✈️',
+    'plane-to-home': '✈️',
+    'train': '🚂',
+    'sick': '🟨',
+    'business-trip': '🧳',
+    'vacation': '🏖️',
+    'rest': ''
+  };
+  return map[st] || '';
+}
+
+// Цвета статусов (для фона в годовом виде, когда не половинки)
+function getStatusColor(st) {
+  const c = {
+    'work-day': '#ff6b6b',
+    'work-night': '#9b59b6',
+    'travel-to': '#3498db',
+    'travel-from': '#3498db',
+    'travel-from-day': '#3498db',
+    'plane-from-home': '#3498db',
+    'plane-to-home': '#3498db',
+    'train': '#3498db',
+    'rest': '#bdc3c7',
+    'sick': '#f1c40f',
+    'business-trip': '#1abc9c',
+    'vacation': '#95a5a6'
+  };
+  return c[st] || '#bdc3c7';
+}
+
 // Рабочие статусы для подсчёта/мини‑месяцев
 function isWorkStatus(st) {
   return ['travel-to','work-day','work-night','travel-from','travel-from-day'].includes(st);
@@ -1961,5 +2013,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
