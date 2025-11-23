@@ -991,8 +991,8 @@ function openBulkEditModalForRange() {
   const noteWrap = modal.querySelector('#bulk-note-wrap');
   const noteInput = modal.querySelector('#bulk-note');
 
-  // восстановить последний выбранный статус
-  try { selectEl.value = localStorage.getItem('lastBulkStatus') || 'auto'; } catch {}
+  // всегда по умолчанию — "Автоматически (по графику)"
+selectEl.value = 'auto';
 
   const sync = () => {
     if (noteWrap) noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
@@ -1004,7 +1004,7 @@ function openBulkEditModalForRange() {
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
-    try { localStorage.setItem('lastBulkStatus', val); } catch {}
+    
 
     const noteText = (noteInput && noteInput.value || '').trim();
 
