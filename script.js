@@ -1000,7 +1000,7 @@ function findDayCellAtClientPoint(x, y) {
   if (!cal) return null;
   const r = cal.getBoundingClientRect();
 
-  // Зажимаем координату внутрь календаря (чуть дальше от краёв)
+  // Зажимаем координату внутрь календаря (чуть отступив от краёв)
   const xi = Math.min(r.right - 2, Math.max(r.left + 2, x));
   const yi = Math.min(r.bottom - 2, Math.max(r.top + 2, y));
 
@@ -1009,31 +1009,44 @@ function findDayCellAtClientPoint(x, y) {
     return n && n.closest ? n.closest('.day') : null;
   };
 
-  // Прямая точка
+  // 1) Прямое попадание
   let el = probe(xi, yi);
   if (el) return el;
 
-  // Горизонтальные «тычки» (приоритет — по горизонтали)
-  const offs = [1,2,3,4,5,6,8,10,12,14,16,18,20];
-  for (const d of offs) {
+  // 2) Вся “стопка” под точкой (если поддерживается)
+  if (document.elementsFromPoint) {
+    const stack = document.elementsFromPoint(xi, yi);
+    el = stack.find(n => n && n.classList && n.classList.contains('day'));
+    if (el) return el;
+  }
+
+  // 3) Горизонтальные «тычки» (приоритет — по горизонтали, чтобы не прыгать между строками)
+  const H = [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24];
+  for (const d of H) {
     el = probe(xi - d, yi) || probe(xi + d, yi);
     if (el) return el;
   }
 
-  // Небольшие вертикальные смещения
-  for (const d of [3,5,7,9]) {
+  // 4) Небольшие вертикальные сдвиги
+  for (const d of [3, 5, 7, 9, 12]) {
     el = probe(xi, yi - d) || probe(xi, yi + d);
     if (el) return el;
   }
 
-  // Диагонали — крайний случай
-  for (const d of [4,8,12,16]) {
-    el = probe(xi - d, yi - 2) || probe(xi + d, yi - 2) || probe(xi - d, yi + 2) || probe(xi + d, yi + 2);
-    if (el) return el;
-  }
-
-  return null;
+  // 5) Крайний фолбэк: берём ближайшую .day по центрам прямоугольников
+  const days = cal.querySelectorAll(':scope > .day');
+  let best = null, bestScore = Infinity;
+  days.forEach(cell => {
+    const cr = cell.getBoundingClientRect();
+    const cx = (cr.left + cr.right) / 2;
+    const cy = (cr.top + cr.bottom) / 2;
+    // даём больший вес вертикальному ряду, чтобы держаться той же строки
+    const score = Math.abs(yi - cy) * 2 + Math.abs(xi - cx);
+    if (score < bestScore) { bestScore = score; best = cell; }
+  });
+  return best;
 }
+
 
 // ========================
 // Свайпы (месяц/год) — при рисовании диапазона отключены
@@ -1950,3 +1963,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
