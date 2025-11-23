@@ -1902,6 +1902,26 @@ function openShareModal() {
     </div>
   `;
   document.body.appendChild(modal);
+  // Безопасные обработчики закрытия — навешиваем СРАЗУ
+const safeClose = () => {
+  try { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); } catch {}
+};
+
+// Клик по фону — закрыть
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) safeClose();
+});
+
+// Кнопка "Закрыть" — закрыть (и не пускать событие наверх)
+const closeBtn = modal.querySelector('#close-share');
+if (closeBtn) {
+  closeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    safeClose();
+  });
+}
+
 
   const content = modal.firstElementChild;
   if (content) {
@@ -1975,8 +1995,6 @@ function openShareModal() {
     tryPrint('year');
   });
 
-  modal.querySelector('#close-share').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
 // ========================
@@ -2025,6 +2043,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
