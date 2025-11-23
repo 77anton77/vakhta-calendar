@@ -952,6 +952,7 @@ function openBulkEditModalForRange() {
         Даты: ${selectionStartDate.toLocaleDateString('ru-RU')} — ${selectionEndDate.toLocaleDateString('ru-RU')}<br>
         Всего: ${count} ${pluralDays(count)}
       </div>
+
       <label style="display:block; margin: 8px 0 6px;">Выберите статус</label>
       <select id="bulk-status" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px;">
         <option value="auto">Автоматически (по графику)</option>
@@ -968,7 +969,15 @@ function openBulkEditModalForRange() {
         <option value="vacation">🏖️ Отпуск</option>
       </select>
 
-      openBulkEditModalForRange
+      <div id="bulk-note-wrap" style="display:none; margin-bottom: 10px;">
+        <label for="bulk-note" style="display:block; margin-bottom:6px;">Заметка для всех дней (командировка):</label>
+        <input id="bulk-note" type="text"
+               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+          Одна и та же заметка будет показана вместо слова «Командировка» во всех выбранных датах.
+        </div>
+      </div>
 
       <div style="display: flex; gap: 10px; margin-top: 10px;">
         <button id="bulk-apply" style="flex: 1; padding: 10px; background: #27ae60; color:#fff; border:none; border-radius:6px;">Применить</button>
@@ -983,27 +992,21 @@ function openBulkEditModalForRange() {
   const noteInput = modal.querySelector('#bulk-note');
 
   // восстановить последний выбранный статус
-  try {
-    const saved = localStorage.getItem('lastBulkStatus') || 'auto';
-    selectEl.value = saved;
-  } catch {}
+  try { selectEl.value = localStorage.getItem('lastBulkStatus') || 'auto'; } catch {}
 
   const sync = () => {
-    noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
+    if (noteWrap) noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
   };
   sync();
   selectEl.addEventListener('change', sync);
 
-  const closeModal = () => {
-    document.body.removeChild(modal);
-  };
+  const closeModal = () => document.body.removeChild(modal);
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
-    // запомнить выбранный статус на будущее
     try { localStorage.setItem('lastBulkStatus', val); } catch {}
 
-    const noteText = (noteInput.value || '').trim();
+    const noteText = (noteInput && noteInput.value || '').trim();
 
     dsList.forEach(ds => {
       if (val === 'auto') {
@@ -1020,7 +1023,7 @@ function openBulkEditModalForRange() {
     });
 
     saveData();
-    clearSelectionHighlight(); // снять подсветку
+    clearSelectionHighlight();
     renderCalendar();
     closeModal();
   });
@@ -1030,7 +1033,6 @@ function openBulkEditModalForRange() {
     closeModal();
   });
 
-  // клик по фону — как отмена
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       clearSelectionHighlight();
@@ -1038,6 +1040,7 @@ function openBulkEditModalForRange() {
     }
   });
 }
+
 
 function clearSelectionHighlight() {
   selectionEls.forEach(el => el.classList.remove('range-selected'));
