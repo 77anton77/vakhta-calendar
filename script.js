@@ -206,9 +206,6 @@ function generateMonthDays(month) {
   return html;
 }
 
-
-
-
 function getMonthStats(month) {
   const year = currentDate.getFullYear();
   const lastDay = new Date(year, month + 1, 0);
@@ -407,8 +404,6 @@ function createDayElement(date, isOtherMonth) {
   return dayEl;
 }
 
-
-
 function renderCalendar() {
   const calendarEl = document.getElementById('calendar');
   const dayHeaders = calendarEl.querySelectorAll('.day-header');
@@ -492,7 +487,6 @@ function renderCalendar() {
   updateLegendVisibility();
 }
 
-
 // ========================
 // Установка старта вахты
 // ========================
@@ -533,6 +527,7 @@ function setVakhtaStartDate() {
         saveData();
         renderCalendar();
         alert(`Дата начала вахты установлена: ${inputDate.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' })}`);
+        queueTgSync('set-start');
       }
     }
     document.body.removeChild(modal);
@@ -656,15 +651,14 @@ function editDayManually(date) {
       </select>
 
       <div id="note-wrap" style="display:none; margin-bottom: 10px;">
-  <label for="note-input" style="display:block; margin-bottom:6px;">Заметка (что за командировка):</label>
-  <input id="note-input" type="text"
-         placeholder="например: мед.осмотр, обучение ОТ, тренинг"
-         style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
-  <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
-    Заметка отобразится маленьким текстом вместо слова «Командировка».
-  </div>
-</div>
-
+        <label for="note-input" style="display:block; margin-bottom:6px;">Заметка (что за командировка):</label>
+        <input id="note-input" type="text"
+               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+          Заметка отобразится маленьким текстом вместо слова «Командировка».
+        </div>
+      </div>
 
       <div style="display: flex; gap: 10px;">
         <button id="save-edit" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 6px;">Сохранить</button>
@@ -709,6 +703,7 @@ function editDayManually(date) {
     saveData();
     renderCalendar();
     document.body.removeChild(modal);
+    queueTgSync('edit-day');
   });
 
   if (manualOverrides[dateStr]) {
@@ -719,6 +714,7 @@ function editDayManually(date) {
       saveData();
       renderCalendar();
       document.body.removeChild(modal);
+      queueTgSync('edit-day');
     });
   }
 
@@ -992,7 +988,7 @@ function openBulkEditModalForRange() {
   const noteInput = modal.querySelector('#bulk-note');
 
   // всегда по умолчанию — "Автоматически (по графику)"
-selectEl.value = 'auto';
+  selectEl.value = 'auto';
 
   const sync = () => {
     if (noteWrap) noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
@@ -1004,7 +1000,6 @@ selectEl.value = 'auto';
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
-    
 
     const noteText = (noteInput && noteInput.value || '').trim();
 
@@ -1026,6 +1021,7 @@ selectEl.value = 'auto';
     clearSelectionHighlight();
     renderCalendar();
     closeModal();
+    queueTgSync('bulk');
   });
 
   modal.querySelector('#bulk-cancel').addEventListener('click', () => {
@@ -1040,7 +1036,6 @@ selectEl.value = 'auto';
     }
   });
 }
-
 
 function clearSelectionHighlight() {
   selectionEls.forEach(el => el.classList.remove('range-selected'));
@@ -1139,6 +1134,7 @@ function resetManualChanges() {
     saveData();
     renderCalendar();
     alert('Все ручные изменения сброшены');
+    queueTgSync('reset');
   }
 }
 
@@ -1389,7 +1385,6 @@ function showHelp() {
   })();
 }
 
-
 // ========================
 // Выбор месяца/года
 // ========================
@@ -1515,6 +1510,7 @@ function showScheduleSelector() {
       renderCalendar();
       updateScheduleButtonText();
       document.body.removeChild(modal);
+      queueTgSync('schedule');
     });
   });
 
@@ -1862,6 +1858,7 @@ function openShareModal() {
     renderCalendar();
     alert('Импорт завершён');
     document.body.removeChild(modal);
+    queueTgSync('import');
   });
 
   modal.querySelector('#print-month').addEventListener('click', () => {
@@ -1960,6 +1957,32 @@ function processPrintParams() {
     renderCalendar();
     updateViewButton();
     setTimeout(() => { print === 'month' ? ensureMonthThenPrint() : ensureYearThenPrint(); }, 100);
+  }
+}
+
+// ========================
+// Автосинхронизация в Telegram Bot (через WebApp.sendData)
+// ========================
+let tgSyncTimer = null;
+function isTGWebApp() {
+  return isTelegramWebApp();
+}
+function queueTgSync(reason) {
+  if (!isTGWebApp()) return;      // только внутри Telegram WebApp
+  if (tgSyncTimer) clearTimeout(tgSyncTimer);
+  tgSyncTimer = setTimeout(() => sendTgSnapshot(reason), 1200); // дебаунс 1.2 сек
+}
+function sendTgSnapshot(reason) {
+  try {
+    const payload = (typeof buildExportPayload === 'function')
+      ? buildExportPayload(true)   // полный снимок (включая ручные правки и заметки)
+      : {};
+    const envelope = { kind: 'snapshot', data: payload, reason: reason || '' };
+    if (isTGWebApp()) {
+      Telegram.WebApp.sendData(JSON.stringify(envelope));
+    }
+  } catch (e) {
+    // молча игнорируем
   }
 }
 
