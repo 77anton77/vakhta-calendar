@@ -80,12 +80,15 @@ button:hover { background: #2980b9; transform: translateY(-2px); }
 /* Эффект hover — только на устройствах с мышью (на тач — без масштаба) */
 @media (hover: hover) and (pointer: fine) {
   .day:hover {
-    transform: scale(1.02);
-    z-index: 1;
-    box-shadow: 0 5px 15px rgba(0,0,0,.1);
+    /* было transform: scale(1.02) — из-за него клетка налезала на соседнюю */
+    transform: none;
+    z-index: auto;
+    /* убираем тень, оставляем только подсветку рамки */
+    box-shadow: none;
     border-color: #3498db;
   }
 }
+
 @media (hover: none), (pointer: coarse) {
   .day:hover { transform: none; box-shadow: none; }
 }
@@ -245,6 +248,12 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
   .legend-item { font-size: 11px; }
   footer { padding: 6px; font-size: 11px; }
 }
+/* Во время рисования диапазона полностью вырубаем hover-оверлеи */
+body.range-selecting .day:hover {
+  transform: none !important;
+  z-index: auto !important;
+  box-shadow: none !important;
+}
 
 /* ========== PRINT ========== */
 @media print {
@@ -264,3 +273,4 @@ footer { text-align: center; padding: 6px; color: #7f8c8d; font-size: 11px; flex
 /* Скрыть ТОЛЬКО месячную навигацию в годовом виде (оставить «Год» кнопки и год по центру) */
 .controls.hide-month-nav #prev-month,
 .controls.hide-month-nav #next-month { display: none !important; }
+
