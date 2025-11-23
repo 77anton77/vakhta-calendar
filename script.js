@@ -210,6 +210,20 @@ function getMonthStats(month) {
 }
 
 // ========================
+// Вспомогательное (локальные ключи дат — без UTC-сдвигов)
+// ========================
+function fmtYMDLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function parseYMDLocal(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+// ========================
 // Данные
 // ========================
 function loadSavedData() {
@@ -223,15 +237,19 @@ function loadSavedData() {
     } else if (data.currentSchedule) {
       currentSchedule = data.currentSchedule;
     }
-    if (data.vakhtaStartDate) {
-      const d = new Date(data.vakhtaStartDate);
-      if (!isNaN(d)) vakhtaStartDate = d;
-    }
-    if (data.manualOverrides) manualOverrides = data.manualOverrides;
 
-    if (data.manualNotes && typeof data.manualNotes === 'object') {
-      manualNotes = data.manualNotes;
+    if (data.vakhtaStartDate) {
+      if (typeof data.vakhtaStartDate === 'string' && data.vakhtaStartDate.length === 10) {
+        const d = parseYMDLocal(data.vakhtaStartDate);
+        if (!isNaN(d)) vakhtaStartDate = d;
+      } else {
+        const d = new Date(data.vakhtaStartDate);
+        if (!isNaN(d)) vakhtaStartDate = d;
+      }
     }
+
+    if (data.manualOverrides) manualOverrides = data.manualOverrides;
+    if (data.manualNotes && typeof data.manualNotes === 'object') manualNotes = data.manualNotes;
 
     if (data.currentView) currentView = data.currentView === 'year' ? 'year' : 'month';
   }
@@ -240,7 +258,7 @@ function loadSavedData() {
 
 function saveData() {
   localStorage.setItem('vakhtaCalendarData', JSON.stringify({
-    vakhtaStartDate: vakhtaStartDate ? vakhtaStartDate.toISOString() : null,
+    vakhtaStartDate: vakhtaStartDate ? fmtYMDLocal(vakhtaStartDate) : null, // ЛОКАЛЬНО
     manualOverrides,
     manualNotes,
     currentSchedule,
@@ -345,18 +363,16 @@ function createDayElement(date, isOtherMonth) {
   const status = calculateVakhtaStatus(date);
   classes.push(`status-${status}`);
 
-  const dateStr = date.toISOString().split('T')[0];
+  // КЛЮЧ ДАТЫ — ЛОКАЛЬНЫЙ
+  const dateStr = fmtYMDLocal(date);
   if (manualOverrides[dateStr]) classes.push('manual-override');
 
   dayEl.className = classes.join(' ');
 
-  // "Командировка" — показываем заметку вместо слова, если есть
-  let statusHtml = '';
-  if (status === 'business-trip' && manualNotes[dateStr]) {
-    statusHtml = `${escapeHtml(manualNotes[dateStr])}`;
-  } else {
-    statusHtml = getStatusText(status);
-  }
+  // Командировка: если есть заметка — показываем её вместо слова
+  const statusHtml = (status === 'business-trip' && manualNotes[dateStr])
+    ? `${escapeHtml(manualNotes[dateStr])}`
+    : getStatusText(status);
 
   dayEl.innerHTML = `
     <div class="day-number">${date.getDate()}</div>
@@ -462,15 +478,15 @@ function setVakhtaStartDate() {
 
   const dateInput = modal.querySelector('#date-input');
   const today = new Date();
-  dateInput.value = today.toISOString().split('T')[0];
+  dateInput.value = fmtYMDLocal(today);
 
   modal.querySelector('#quick-today').addEventListener('click', () => {
-    dateInput.value = today.toISOString().split('T')[0];
+    dateInput.value = fmtYMDLocal(new Date());
   });
 
   modal.querySelector('#confirm-date').addEventListener('click', () => {
     if (dateInput.value) {
-      const inputDate = new Date(dateInput.value);
+      const inputDate = parseYMDLocal(dateInput.value);
       if (!isNaN(inputDate.getTime())) {
         vakhtaStartDate = inputDate;
         saveData();
@@ -493,7 +509,7 @@ function setVakhtaStartDate() {
 // Логика статусов
 // ========================
 function calculateVakhtaStatus(date) {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = fmtYMDLocal(date);
   if (manualOverrides[dateStr]) return manualOverrides[dateStr];
   if (!vakhtaStartDate) return 'rest';
 
@@ -561,7 +577,7 @@ function getStatusText(status) {
 // Редактирование дня (один день) — с заметкой для командировки
 // ========================
 function editDayManually(date) {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = fmtYMDLocal(date);
   const currentStatus = calculateVakhtaStatus(date);
 
   const modal = document.createElement('div');
@@ -674,68 +690,56 @@ function editDayManually(date) {
 }
 
 // ========================
-// Массовое редактирование (тач + ПК) — с заметкой для командировки
+// Массовое редактирование (тач + ПК) — с фиксом старта "под пальцем" и локальными датами
 // ========================
 function addDayTouchHandlers(el) {
   let touchStartTime = 0;
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
-
-  // НОВОЕ: запоминаем последнюю валидную дату под пальцем (на случай отрыва в "зазоре")
-  let lastHoverDs = null;
-
-  // НОВОЕ: приоритет строки — номер недели (0..5), где началось выделение
-  let startRowIdx = null;
+  let lastHoverDs = null;  // последняя валидная дата под пальцем
+  let startRowIdx = null;  // индекс строки (недели) старта, 0..5
 
   el.addEventListener('touchstart', (e) => {
-  if (currentView !== 'month') return;
+    if (currentView !== 'month') return;
 
-  // Снимем старый диапазон, если был
-  if (selectionEls && selectionEls.size) {
-    clearSelectionHighlight();
-  }
+    if (selectionEls && selectionEls.size) clearSelectionHighlight();
 
-  const t = e.touches && e.touches[0];
-  if (!t) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
 
-  // Запоминаем момент и начальные координаты
-  touchStartTime = Date.now();
-  moved = false;
-  startX = t.clientX;
-  startY = t.clientY;
+    touchStartTime = Date.now();
+    moved = false;
+    startX = t.clientX;
+    startY = t.clientY;
 
-  // КРИТИЧЕСКОЕ: берём ячейку именно под пальцем, а не e.currentTarget
-  const hitEl = findDayCellAtClientPoint(t.clientX, t.clientY, null) || e.currentTarget;
-  const ds = hitEl && hitEl.getAttribute('data-date');
-  if (!ds) return;
+    // ВАЖНО: определяем клетку именно под пальцем (а не e.currentTarget)
+    const hitEl = findDayCellAtClientPoint(t.clientX, t.clientY, null) || e.currentTarget;
+    const ds = hitEl && hitEl.getAttribute('data-date');
+    if (!ds) return;
 
-  tapTargetDateStr = ds;
-  lastHoverDs = ds; // на старте уже есть валидная дата
+    tapTargetDateStr = ds;
+    lastHoverDs = ds;
 
-  // Определим строку (неделю), где началось выделение — приоритет той же строки
-  const daysList = document.querySelectorAll('#calendar > .day'); // 42 клетки
-  let startIndex = -1;
-  for (let i = 0; i < daysList.length; i++) {
-    if (daysList[i] === hitEl) { startIndex = i; break; }
-  }
-  startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
+    // приоритет строки старта
+    const daysList = document.querySelectorAll('#calendar > .day');
+    let startIndex = -1;
+    for (let i = 0; i < daysList.length; i++) { if (daysList[i] === hitEl) { startIndex = i; break; } }
+    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
 
-  if (longPressTimer) clearTimeout(longPressTimer);
-  selecting = false;
-  selectionStartDate = new Date(ds);
-  selectionEndDate = new Date(ds);
+    if (longPressTimer) clearTimeout(longPressTimer);
+    selecting = false;
+    selectionStartDate = parseYMDLocal(ds);
+    selectionEndDate   = parseYMDLocal(ds);
 
-  // long-press — включаем выбор
-  longPressTimer = setTimeout(() => {
-    if (moved) return;
-    selecting = true;
-    disableSwipe = true;
-    document.body.classList.add('range-selecting');
-    updateSelectionHighlight();
-  }, LONG_PRESS_MS);
-}, { passive: true });
-
+    longPressTimer = setTimeout(() => {
+      if (moved) return;
+      selecting = true;
+      disableSwipe = true;
+      document.body.classList.add('range-selecting');
+      updateSelectionHighlight();
+    }, LONG_PRESS_MS);
+  }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
     if (!tapTargetDateStr) return;
@@ -745,7 +749,6 @@ function addDayTouchHandlers(el) {
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
-    // До старта выделения отменяем long-press только при явном вертикальном скролле
     if (!selecting) {
       const dist = Math.hypot(dx, dy);
       if (dist > MOVE_CANCEL_PX && Math.abs(dy) > Math.abs(dx)) {
@@ -754,14 +757,12 @@ function addDayTouchHandlers(el) {
       }
     }
 
-    // Уже рисуем диапазон — уточняем конечную дату
     if (selecting) {
-      // НОВОЕ: передаём приоритет строки старта
       const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
       const ds = dayEl && dayEl.getAttribute('data-date');
       if (ds) {
-        selectionEndDate = new Date(ds);
-        lastHoverDs = ds; // запомним последнюю валидную дату
+        selectionEndDate = parseYMDLocal(ds);
+        lastHoverDs = ds;
         updateSelectionHighlight();
         if (e && e.cancelable) e.preventDefault();
       }
@@ -771,14 +772,12 @@ function addDayTouchHandlers(el) {
   const finish = (e) => {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
-    // На завершении уточним конечную дату
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
-      // НОВОЕ: используем приоритет строки старта
       const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
       let ds = dayEl && dayEl.getAttribute('data-date');
-      if (!ds && lastHoverDs) ds = lastHoverDs; // фолбэк, если палец оторвался “в зазоре”
-      if (ds) selectionEndDate = new Date(ds);
+      if (!ds && lastHoverDs) ds = lastHoverDs;
+      if (ds) selectionEndDate = parseYMDLocal(ds);
     }
 
     if (selecting) {
@@ -793,18 +792,17 @@ function addDayTouchHandlers(el) {
         openBulkEditModalForRange();
       } else {
         if (!moved && tapTargetDateStr) {
-          editDayManually(new Date(tapTargetDateStr));
+          editDayManually(parseYMDLocal(tapTargetDateStr));
         } else {
           clearSelectionHighlight();
         }
       }
     } else {
-      // Обычный тап/двойной тап
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
           if (e && e.cancelable) e.preventDefault();
-          editDayManually(new Date(tapTargetDateStr));
+          editDayManually(parseYMDLocal(tapTargetDateStr));
         } else {
           const now = Date.now();
           const same = (lastTapDateStr === tapTargetDateStr);
@@ -812,7 +810,7 @@ function addDayTouchHandlers(el) {
           const dist = Math.hypot(startX - lastTapX, startY - lastTapY);
           if (same && timeOk && dist < 12) {
             if (e && e.cancelable) e.preventDefault();
-            editDayManually(new Date(tapTargetDateStr));
+            editDayManually(parseYMDLocal(tapTargetDateStr));
             lastTapTime = 0; lastTapDateStr = null;
           } else {
             lastTapTime = now;
@@ -839,7 +837,6 @@ function addDayTouchHandlers(el) {
   });
 }
 
-
 function setupMouseRangeSelection() {
   document.addEventListener('mousedown', (e) => {
     if (currentView !== 'month') return;
@@ -851,8 +848,8 @@ function setupMouseRangeSelection() {
 
     selecting = true;
     mouseSelecting = true;
-    selectionStartDate = new Date(ds);
-    selectionEndDate = new Date(ds);
+    selectionStartDate = parseYMDLocal(ds);
+    selectionEndDate = parseYMDLocal(ds);
     document.body.classList.add('range-selecting');
     updateSelectionHighlight();
     e.preventDefault();
@@ -865,7 +862,7 @@ function setupMouseRangeSelection() {
     if (!dayEl) return;
     const ds = dayEl.getAttribute('data-date');
     if (!ds) return;
-    selectionEndDate = new Date(ds);
+    selectionEndDate = parseYMDLocal(ds);
     updateSelectionHighlight();
   });
 
@@ -955,7 +952,10 @@ function openBulkEditModalForRange() {
   const noteWrap = modal.querySelector('#bulk-note-wrap');
   const noteInput = modal.querySelector('#bulk-note');
 
-  selectEl.value = 'auto';
+  try {
+    const saved = localStorage.getItem('lastBulkStatus') || 'auto';
+    selectEl.value = saved;
+  } catch {}
 
   const sync = () => {
     if (noteWrap) noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
@@ -967,6 +967,7 @@ function openBulkEditModalForRange() {
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
+    try { localStorage.setItem('lastBulkStatus', val); } catch {}
     const noteText = (noteInput && noteInput.value || '').trim();
 
     dsList.forEach(ds => {
@@ -1014,14 +1015,14 @@ function getDateStringsBetween(a, b) {
   const end   = new Date(Math.max(a, b));
   start.setHours(0,0,0,0);
   end.setHours(0,0,0,0);
-  const arr = [];
+  const out = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    arr.push(d.toISOString().split('T')[0]);
+    out.push(fmtYMDLocal(d)); // ЛОКАЛЬНЫЙ ключ
   }
-  return arr;
+  return out;
 }
 
-// Поиск ячейки под пальцем с «липкими» оффсетами (фикс правых краёв — воскресенье)
+// Поиск ячейки под пальцем: с приоритетом той же строки (недели)
 function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) {
   const cal = document.getElementById('calendar');
   if (!cal) return null;
@@ -1047,7 +1048,7 @@ function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) 
     if (el) return el;
   }
 
-  // 3) Горизонтальные "тычки"
+  // 3) Горизонтальные «тычки»
   const H = [1,2,3,4,6,8,10,12,14,16,18,20,24];
   for (const d of H) {
     el = probe(xi - d, yi) || probe(xi + d, yi);
@@ -1060,7 +1061,7 @@ function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) 
     if (el) return el;
   }
 
-  // 5) Крайний фолбэк: ближайшая .day по центрам, но с приоритетом той же строки (недели)
+  // 5) Крайний фолбэк: ближайшая .day по центрам, с приоритетом той же строки
   const days = cal.querySelectorAll(':scope > .day'); // 42 клетки месяца
   let best = null, bestScore = Infinity;
 
@@ -1073,79 +1074,12 @@ function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) 
     const row = Math.floor(i / 7); // строка 0..5
     const rowPenalty = (preferredRowIdx != null && row !== preferredRowIdx) ? 10000 : 0;
 
-    // Больше вес вертикали, чтобы держаться той же строки
+    // Вертикали даём больший вес, чтобы держаться той же строки
     const score = rowPenalty + Math.abs(yi - cy) * 2 + Math.abs(xi - cx);
 
     if (score < bestScore) { bestScore = score; best = cell; }
   }
   return best;
-}
-
-
-
-// ========================
-// Свайпы (месяц/год) — при рисовании диапазона отключены
-// ========================
-function setupSwipeNavigation() {
-  const cal = document.getElementById('calendar');
-  if (!cal || cal.dataset.swipeAttached === '1') return;
-  cal.dataset.swipeAttached = '1';
-
-  const SWIPE_X = 50, SWIPE_Y = 30;
-
-  cal.addEventListener('touchstart', (e) => {
-    if (disableSwipe) return;
-    if (currentView !== 'month' && currentView !== 'year') return;
-    if (e.touches.length !== 1) return;
-    swipeTracking = true;
-    swipeConsumed = false;
-    const t = e.touches[0];
-    swipeStartX = t.clientX;
-    swipeStartY = t.clientY;
-  }, { passive: true });
-
-  cal.addEventListener('touchmove', (e) => {
-    if (disableSwipe) return;
-    if (!swipeTracking) return;
-    const t = e.touches[0];
-    if (!t) return;
-    const dx = t.clientX - swipeStartX;
-    const dy = t.clientY - swipeStartY;
-    if (!swipeConsumed && Math.abs(dx) > SWIPE_X && Math.abs(dy) < SWIPE_Y) {
-      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-      selecting = false;
-      swipeConsumed = true;
-      if (e.cancelable) e.preventDefault();
-    }
-  }, { passive: false });
-
-  cal.addEventListener('touchend', (e) => {
-    if (disableSwipe) return;
-    if (!swipeTracking) return;
-    swipeTracking = false;
-    if (swipeConsumed) {
-      const touch = e.changedTouches && e.changedTouches[0];
-      const endX = touch ? touch.clientX : swipeStartX;
-      const dx = endX - swipeStartX;
-      if (Math.abs(dx) >= SWIPE_X) {
-        if (dx < 0) {
-          if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() + 1);
-          else currentDate.setFullYear(currentDate.getFullYear() + 1);
-        } else {
-          if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() - 1);
-          else currentDate.setFullYear(currentDate.getFullYear() - 1);
-        }
-        renderCalendar();
-      }
-      if (e.cancelable) e.preventDefault();
-    }
-  }, { passive: false });
-
-  cal.addEventListener('touchcancel', () => {
-    if (disableSwipe) return;
-    swipeTracking = false;
-    swipeConsumed = false;
-  });
 }
 
 // ========================
@@ -1178,7 +1112,7 @@ function showStatistics() {
   };
   
   Object.keys(manualOverrides).forEach(dateStr => {
-    const date = new Date(dateStr);
+    const date = parseYMDLocal(dateStr);
     if (date.getFullYear() === currentYear) {
       const status = manualOverrides[dateStr];
       const autoStatus = calculateAutoStatus(date);
@@ -1567,40 +1501,8 @@ function getCurrentScheduleName() {
 }
 
 // ========================
-// Вспомогательное
-// ========================
-function monthNameRu(m) {
-  return new Date(currentDate.getFullYear(), m).toLocaleDateString('ru-RU', { month: 'long' });
-}
-function isWorkStatus(st) { return ['travel-to','work-day','work-night','travel-from','travel-from-day'].includes(st); }
-function isSpecialStatus(st) { return ['sick','business-trip','vacation'].includes(st); }
-function isTodayDate(d) {
-  const t = new Date();
-  return d.getDate()===t.getDate() && d.getMonth()===t.getMonth() && d.getFullYear()===t.getFullYear();
-}
-function getStatusSymbol(st) {
-  const map = {
-    'work-day':'☀️','work-night':'🌙','travel-to':'➡️','travel-from':'⬅️','travel-from-day':'⬅️',
-    'plane-from-home':'✈️','plane-to-home':'✈️','train':'🚂','sick':'🟨','business-trip':'🧳','vacation':'🏖️','rest':''
-  }; return map[st] || '';
-}
-function getStatusColor(st) {
-  const c = {'work-day':'#ff6b6b','work-night':'#9b59b6','travel-to':'#3498db','travel-from':'#3498db','travel-from-day':'#3498db','plane-from-home':'#3498db','plane-to-home':'#3498db','train':'#3498db','rest':'#bdc3c7','sick':'#f1c40f','business-trip':'#1abc9c','vacation':'#95a5a6'};
-  return c[st] || '#bdc3c7';
-}
-
-function escapeHtml(s) {
-  try {
-    return String(s).replace(/[&<>"']/g, ch => (
-      ch === '&' ? '&amp;' :
-      ch === '<' ? '&lt;'  :
-      ch === '>' ? '&gt;'  :
-      ch === '"' ? '&quot;': '&#39;'
-    ));
-  } catch { return ''; }
-}
-
 // Заголовки для печати
+// ========================
 function showPrintTitle(title, subtitle) {
   let el = document.getElementById('print-title');
   if (!el) {
@@ -1707,7 +1609,7 @@ function tryPrint(kind /* 'month'|'year' */) {
 
 function openExternalPrint(kind) {
   const code = buildExportCode(false);
-  const d = currentDate ? currentDate.toISOString().split('T')[0] : '';
+  const d = currentDate ? fmtYMDLocal(currentDate) : '';
   const url = new URL(location.href.split('#')[0]);
   url.searchParams.set('code', code);
   url.searchParams.set('print', kind);
@@ -1731,14 +1633,14 @@ function processPrintParams() {
     const obj = decodeImportCode(code);
     if (obj && typeof obj === 'object') {
       if (obj.vakhtaStartDate) {
-        const dt = new Date(obj.vakhtaStartDate);
+        const dt = parseYMDLocal(obj.vakhtaStartDate);
         if (!isNaN(dt)) vakhtaStartDate = dt;
       }
       if (obj.currentSchedule) currentSchedule = obj.currentSchedule;
     }
   }
   if (d) {
-    const dd = new Date(d);
+    const dd = parseYMDLocal(d);
     if (!isNaN(dd)) currentDate = dd;
   }
 
@@ -1758,7 +1660,7 @@ function buildExportPayload(full = false) {
     v: 1,
     generatedAt: new Date().toISOString(),
     currentSchedule: typeof currentSchedule === 'string' ? currentSchedule : 'standard',
-    vakhtaStartDate: vakhtaStartDate ? vakhtaStartDate.toISOString().split('T')[0] : null
+    vakhtaStartDate: vakhtaStartDate ? fmtYMDLocal(vakhtaStartDate) : null // ЛОКАЛЬНО
   };
   if (full) {
     payload.manualOverrides = manualOverrides || {};
@@ -1841,20 +1743,6 @@ function openShareModal() {
         </div>
 
         <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div style="font-weight:600; margin-bottom:8px;">Импорт</div>
-          <textarea id="import-code" placeholder="Вставьте код здесь" style="width:100%; height:80px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
-          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-              <input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)
-            </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-              <input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)
-            </label>
-            <button id="apply-import" style="margin-left:auto; padding:8px 10px; background:#3498db; color:#fff; border:none; border-radius:6px;">Импортировать</button>
-          </div>
-        </div>
-
-        <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
           <div style="font-weight:600; margin-bottom:8px;">Печать</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="print-month" style="padding:8px 10px; background:#2ecc71; color:#fff; border:none; border-radius:6px;">Печать: текущий месяц</button>
@@ -1910,7 +1798,7 @@ function openShareModal() {
     const mode = modal.querySelector('input[name="import-mode"]:checked').value;
     const applyBasic = () => {
       if (obj.vakhtaStartDate) {
-        const d = new Date(obj.vakhtaStartDate);
+        const d = parseYMDLocal(obj.vakhtaStartDate);
         if (!isNaN(d)) vakhtaStartDate = d;
       }
       if (obj.currentSchedule) {
@@ -1998,6 +1886,3 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
-
-
