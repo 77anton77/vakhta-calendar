@@ -1508,10 +1508,10 @@ function showHelp() {
               Текущий режим: <b>${curMode}</b>
             </span>
           </div>` : ''}
-          <p>Стандартный (дневные/ночные смены) — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-          <p>Сахалинский (дневные/ночные смены) — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-          <p>Стандартный дневной — с самолетами; 28 дневных; выезд: день + выезд</p>
-          <p>Сахалинский дневной — без самолетов; 28 дневных; выезд: день + выезд</p>
+          <p><b>Стандартный</b> (дневные/ночные смены) — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+          <p><b>Сахалинский</b> (дневные/ночные смены) — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+          <p><b>Стандартный дневной</b> — с самолетами; 28 дневных; выезд: день + выезд</p>
+          <p><b>Сахалинский дневной</b> — без самолетов; 28 дневных; выезд: день + выезд</p>
         </div>
 
         
@@ -1575,12 +1575,12 @@ function showHelp() {
           <span class="help-chev">▸</span>
         </h4>
         <div class="help-body">
-          <p>Кнопка «Поделиться» позволяет:</p>
+          <p>Кнопка «<b>Поделиться</b>» позволяет:</p>
           <ul class="help-ul">
-            <li>Экспортировать базовый график (дата начала + режим) — короткий код для пересылки;</li>
-            <li>Экспортировать полный снимок (включая ручные правки) — длинный код;</li>
-            <li>Импортировать код (заменить всё или применить только базовый график);</li>
-            <li>Напечатать текущий месяц или весь год (можно «Сохранить как PDF»).</li>
+            <li><b>Экспортировать базовый график</b> (дата начала + режим) — короткий код для пересылки;</li>
+            <li><b>Экспортировать полный снимок</b> (включая ручные правки) — длинный код;</li>
+            <li><b>Импортировать код</b> (заменить всё или применить только базовый график);</li>
+            <li><b>Напечатать текущий месяц или весь год</b> (можно «Сохранить как PDF»).</li>
           </ul>
           <p>При печати сохраняется выбранный период: «Печать: текущий месяц» печатает месяц из шапки календаря, «Печать: год» — текущий год. Чтобы распечатать другой период, сначала переключите месяц/год в шапке, затем снова выполните печать.</p>
         </div>
@@ -1608,7 +1608,7 @@ function showHelp() {
   `;
   document.body.appendChild(modal);
 
-  // Локальные стили (без влияния на страницу)
+  // Локальные стили
   const style = document.createElement('style');
   style.textContent = `
     .help-ttl {
@@ -1617,33 +1617,27 @@ function showHelp() {
       border:1px solid #e6eef8;
     }
     .help-ico { width:22px; text-align:center; }
-    .help-txt {
-      color:#2d7ef7; font-weight:600; flex:1; user-select:none;
-    }
+    .help-txt { color:#2d7ef7; font-weight:600; flex:1; user-select:none; }
     .help-chev { color:#2d7ef7; transition:transform .2s ease; }
     .help-body { padding:8px 6px 10px 30px; }
     .help-body p { margin:6px 0; }
     .help-ul { margin:6px 0 0 18px; padding:0; }
     .help-ul li { margin:4px 0; }
-    /* Активная (раскрытая) секция */
     .help-ttl.open { background:#eef5ff; border-color:#cfe3ff; }
     .help-ttl.open .help-chev { transform:rotate(90deg); }
   `;
   modal.querySelector('.help-modal').appendChild(style);
 
-  // Аккордеон: каждая h4 управляет своим ближайшим .help-body
+  // Аккордеон
   const headers = Array.from(modal.querySelectorAll('.help-ttl'));
   const bodies  = Array.from(modal.querySelectorAll('.help-body'));
-
   const setCollapsed = (idx, collapsed) => {
     const h = headers[idx], b = bodies[idx];
     if (!h || !b) return;
     b.style.display = collapsed ? 'none' : '';
     if (collapsed) h.classList.remove('open'); else h.classList.add('open');
   };
-  // Первая секция открыта, остальные закрыты
   headers.forEach((h, idx) => setCollapsed(idx, idx !== 0));
-
   headers.forEach((h, idx) => {
     h.addEventListener('click', () => {
       const b = bodies[idx];
@@ -1660,6 +1654,7 @@ function showHelp() {
     if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
   }});
 }
+
 
 
 
@@ -2236,6 +2231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
