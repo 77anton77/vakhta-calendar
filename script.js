@@ -2257,65 +2257,131 @@ function ensureActionsBar() {
   }
   return actions;
 }
+// показать короткое уведомление (тост)
+function showToast(msg, ms = 1800) {
+  try {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      background: rgba(0,0,0,.82); color: #fff; padding: 8px 12px; border-radius: 8px;
+      font: 13px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      z-index: 2000; max-width: 90%; text-align: center;
+    `;
+    document.body.appendChild(t);
+    setTimeout(() => { try { t.remove(); } catch {} }, ms);
+  } catch {}
+}
+
+// флажки из URL (?name=1|true|yes)
+function queryFlag(name, def = false) {
+  try {
+    const v = new URLSearchParams(location.search).get(name);
+    if (v == null) return def;
+    return /^(1|true|yes)$/i.test(v);
+  } catch { return def; }
+}
 
 // Тест-кнопки (рисуются всегда)
+// Одна умная кнопка синхронизации
 function addTgTestButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
-  const old = actions.querySelectorAll('.tg-test-btn');
-  old.forEach(b => b.remove());
 
-  // 1) Кнопка отправки через WebApp (если объект доступен)
-  const btnSend = document.createElement('button');
-  btnSend.className = 'tg-test-btn';
-  btnSend.textContent = 'TG: sendData (snapshot)';
-  btnSend.style.cssText = 'padding:8px 10px; background:#6c757d; color:#fff; border:none; border-radius:6px; cursor:pointer;';
-  btnSend.onclick = () => {
+  // убираем старые тест‑кнопки, если были
+  actions.querySelectorAll('.tg-test-btn').forEach(b => b.remove());
+
+  // логика видимости
+  const inTG = isTelegramWebApp();                   // открыт в Telegram (по объекту или hash)
+  const forceShow = queryFlag('sync', false);        // ?sync=1 — принудительно показать
+  const forceHide = (new URLSearchParams(location.search).get('sync') === '0'); // ?sync=0 — скрыть
+
+  if ((!(inTG)) && !forceShow) return;               // вне Telegram — кнопку не показываем (если не принудительно)
+  if (forceHide) return;                             // принудительно скрыто
+
+  // создаём кнопку
+  const btn = document.createElement('button');
+  btn.className = 'tg-test-btn';
+  btn.textContent = '🔄 Синхронизировать с ботом';
+  btn.title = 'Отправит актуальный календарь боту';
+  btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
+
+  // вставляем рядом с "Поделиться" (если есть), иначе в конец actions
+  const shareBtn = document.getElementById('share');
+  if (shareBtn && shareBtn.parentNode === actions) {
+    shareBtn.insertAdjacentElement('afterend', btn);
+  } else {
+    actions.appendChild(btn);
+  }
+
+  // username бота для deep-link (замените на свой, без @)
+  const BOT_USERNAME = 'YOUR_BOT_USERNAME';
+
+  let pending = false;
+  const setPending = (v, label) => {
+    pending = v;
+    btn.disabled = v;
+    btn.style.opacity = v ? '0.75' : '1';
+    if (label) btn.textContent = label;
+  };
+
+  btn.addEventListener('click', () => {
+    if (pending) return;
+    const hasWA = !!(window.Telegram && Telegram.WebApp);
+
+    setPending(true, '⏳ Синхронизация…');
     try {
       const payload = buildExportPayload(true);
-      const envelope = { kind: 'snapshot', data: payload, reason: 'manual-test' };
-      if (window.Telegram && Telegram.WebApp) {
-        Telegram.WebApp.sendData(JSON.stringify(envelope));
-        alert('Отправлено через Telegram.WebApp.sendData. Проверьте чат бота и логи web_app_data.');
+      const envelope = { kind: 'snapshot', data: payload, reason: 'manual-sync' };
+
+      if (hasWA) {
+        // нормальные клиенты Telegram WebApp
+        try {
+          Telegram.WebApp.sendData(JSON.stringify(envelope));
+          setPending(false, '✅ Синхронизировано');
+          showToast('Отправлено боту');
+          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1500);
+        } catch (e) {
+          setPending(false, '⚠️ Ошибка, повторите');
+          showToast('Не удалось отправить', 2000);
+          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
+        }
       } else {
-        alert('Telegram.WebApp не обнаружен (страница открыта не как WebApp или клиент без объекта). Используйте нижнюю кнопку.');
+        // fallback: deep-link SNAP-...
+        if (!BOT_USERNAME || BOT_USERNAME === 'YOUR_BOT_USERNAME') {
+          setPending(false, '⚠️ Укажите BOT_USERNAME');
+          showToast('Укажите BOT_USERNAME в коде', 2200);
+          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
+          return;
+        }
+        const code = buildExportCode(true);
+        const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
+        // пытаемся открыть; если браузер блокирует — пользователь увидит предупреждение
+        try { window.open(url, '_blank'); }
+        catch { window.location.href = url; }
+        setPending(false, '✅ Открываю бота…');
+        setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1500);
       }
     } catch (e) {
-      alert('Ошибка sendData: ' + (e && e.message ? e.message : e));
+      setPending(false, '⚠️ Ошибка, повторите');
+      showToast('Ошибка синхронизации', 2000);
+      setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
     }
-  };
-
-  // 2) Кнопка deep-link (fallback из браузера)
-  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← ЗАМЕНИТЕ на username вашего бота (без @)
-  const btnLink = document.createElement('button');
-  btnLink.className = 'tg-test-btn';
-  btnLink.textContent = 'Deep-link: t.me/... (SNAP-...)';
-  btnLink.style.cssText = 'padding:8px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer;';
-  btnLink.onclick = () => {
-    try {
-      if (!BOT_USERNAME || BOT_USERNAME === 'YOUR_BOT_USERNAME') {
-        alert('Укажите BOT_USERNAME в addTgTestButton');
-        return;
-      }
-      const code = buildExportCode(true);
-      const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
-      window.open(url, '_blank');
-    } catch (e) {
-      alert('Ошибка deep-link: ' + (e && e.message ? e.message : e));
-    }
-  };
-
-  actions.prepend(btnLink);
-  actions.prepend(btnSend);
+  });
 }
+
 
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
   try {
+    const params = new URLSearchParams(location.search);
+    const dbg = params.get('debug');
+    if (!(dbg === '1' || /^true$/i.test(dbg))) return; // по умолчанию НЕ показываем
+
     const hasTg = !!window.Telegram;
     const hasWA = !!(window.Telegram && window.Telegram.WebApp);
     const inTG = isTelegramWebApp();
-    const hash = (location.hash || '').slice(0, 80);
+    const hash = (location.hash || '').slice(0, 120);
 
     const div = document.createElement('div');
     div.textContent = `TG:${inTG ? 'YES' : 'NO'} | obj:${hasWA ? 'YES' : (hasTg ? 'tg-only' : 'no')} | hash:${hash}`;
@@ -2323,6 +2389,7 @@ function showDebugBanner() {
     document.body.appendChild(div);
   } catch {}
 }
+
 
 // ========================
 // Запуск
@@ -2334,4 +2401,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
