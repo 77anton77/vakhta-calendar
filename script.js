@@ -809,6 +809,10 @@ function addDayTouchHandlers(el) {
   let lastHoverDs = null;  // последняя валидная дата под пальцем
   let startRowIdx = null;  // индекс строки (недели) старта, 0..5
 
+  // НОВОЕ: порог и флаг снятия "замка строки"
+  const ROW_UNLOCK_PX = Math.max(16, Math.round(12 * (window.devicePixelRatio || 1)));
+  let rowLockReleased = false;
+
   el.addEventListener('touchstart', (e) => {
     if (currentView !== 'month') return;
 
@@ -821,6 +825,8 @@ function addDayTouchHandlers(el) {
     moved = false;
     startX = t.clientX;
     startY = t.clientY;
+
+    rowLockReleased = false; // НОВОЕ
 
     // ВАЖНО: определяем клетку именно под пальцем (а не e.currentTarget)
     const hitEl = findDayCellAtClientPoint(t.clientX, t.clientY, null) || e.currentTarget;
@@ -867,15 +873,23 @@ function addDayTouchHandlers(el) {
     }
 
     if (selecting) {
-      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
-      const ds = dayEl && dayEl.getAttribute('data-date');
-      if (ds) {
-        selectionEndDate = parseYMDLocal(ds);
-        lastHoverDs = ds;
-        updateSelectionHighlight();
-        if (e && e.cancelable) e.preventDefault();
-      }
-    }
+  // если ушли вертикально дальше порога — снимаем "замок строки"
+  const vShift = Math.abs(t.clientY - startY);
+  if (!rowLockReleased && vShift > ROW_UNLOCK_PX) {
+    rowLockReleased = true;
+  }
+
+  const prefRow = rowLockReleased ? null : startRowIdx;
+  const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
+  const ds = dayEl && dayEl.getAttribute('data-date');
+  if (ds) {
+    selectionEndDate = parseYMDLocal(ds);
+    lastHoverDs = ds;
+    updateSelectionHighlight();
+    if (e && e.cancelable) e.preventDefault();
+  }
+}
+
   }, { passive: false });
 
   const finish = (e) => {
@@ -2070,6 +2084,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
