@@ -426,9 +426,8 @@ function setupEventListeners() {
   document.getElementById('next-year').addEventListener('click', () => { currentDate.setFullYear(currentDate.getFullYear() + 1); renderCalendar(); });
   document.getElementById('today').addEventListener('click', () => { currentDate = new Date(); renderCalendar(); });
 
- const shareBtn = document.getElementById('share');
-if (shareBtn) shareBtn.addEventListener('click', openShareModal);
-
+  const shareBtn = document.getElementById('share');
+  if (shareBtn) shareBtn.addEventListener('click', openShareModal);
 
   document.getElementById('set-vakhta').addEventListener('click', setVakhtaStartDate);
   document.getElementById('show-stats').addEventListener('click', showStatistics);
@@ -799,10 +798,7 @@ function editDayManually(date) {
 }
 
 // ========================
-// Массовое редактирование (тач + ПК) — с фиксом старта "под пальцем" и локальными датами
-// ========================
-// ========================
-// Массовое редактирование (тач) — привязка к сетке по индексам (0..41)
+// Массовое редактирование (тач) — прямоугольник по сетке
 // ========================
 function addDayTouchHandlers(el) {
   let touchStartTime = 0;
@@ -810,12 +806,14 @@ function addDayTouchHandlers(el) {
   let moved = false;
   let tapTargetDateStr = null;
 
-  // Снимок ячеек на момент жеста
-  let cells = null;        // Array<HTMLElement> длиной 42
-  let colCenters = null;   // [7] центры X
-  let rowCenters = null;   // [6] центры Y
+  // Снимок сетки
+  let cells = null;        // 42 ячейки
+  let colCenters = null;   // [7] X-центры
+  let rowCenters = null;   // [6] Y-центры
   let startIdx = null;     // 0..41
   let endIdx = null;       // 0..41
+  let startRow = null, startCol = null;
+  let curRow = null, curCol = null;
 
   const nearestIndex = (arr, v) => {
     let best = 0, bestDist = Infinity;
@@ -831,19 +829,20 @@ function addDayTouchHandlers(el) {
     if (list.length < 42) return false;
     cells = list;
 
-    // найти индекс hitEl
+    // индекс старта
     startIdx = list.indexOf(hitEl);
     if (startIdx < 0) startIdx = 0;
-    const startRow = Math.floor(startIdx / 7);
+    startRow = Math.floor(startIdx / 7);
+    startCol = startIdx % 7;
 
-    // центры строк (берём первый столбец каждой строки)
+    // центры строк (первый столбец каждой строки)
     rowCenters = [];
     for (let r = 0; r < 6; r++) {
       const cell = list[r * 7];
       const cr = cell.getBoundingClientRect();
       rowCenters.push((cr.top + cr.bottom) / 2);
     }
-    // центры колонок (берём по строке старта)
+    // центры колонок (по строке старта)
     colCenters = [];
     for (let c = 0; c < 7; c++) {
       const cell = list[startRow * 7 + c];
@@ -866,7 +865,6 @@ function addDayTouchHandlers(el) {
     startX = t.clientX;
     startY = t.clientY;
 
-    // Ячейка именно под пальцем (или текущая ячейка)
     const hit = (function () {
       const n = document.elementFromPoint(startX, startY);
       return n && n.closest ? n.closest('.day') : null;
@@ -876,10 +874,8 @@ function addDayTouchHandlers(el) {
     if (!ds) return;
     tapTargetDateStr = ds;
 
-    // подготовить сетку
     if (!buildGrid(hit)) return;
 
-    // старт диапазона по индексам
     endIdx = startIdx;
     selecting = false;
 
@@ -892,7 +888,8 @@ function addDayTouchHandlers(el) {
       selecting = true;
       disableSwipe = true;
       document.body.classList.add('range-selecting');
-      updateSelectionHighlightIndices(startIdx, endIdx, cells);
+      // начальная 1x1 подсветка
+      updateSelectionHighlightRect(startRow, startCol, startRow, startCol, cells);
     }, LONG_PRESS_MS);
   }, { passive: true });
 
@@ -913,15 +910,14 @@ function addDayTouchHandlers(el) {
       return;
     }
 
-    // Снэп к ближайшей колонке/строке
     if (cells && colCenters && rowCenters) {
-      const col = nearestIndex(colCenters, t.clientX);
-      const row = nearestIndex(rowCenters, t.clientY);
-      const idx = row * 7 + col;
+      curCol = nearestIndex(colCenters, t.clientX);
+      curRow = nearestIndex(rowCenters, t.clientY);
+      const idx = curRow * 7 + curCol;
 
       if (idx !== endIdx && idx >= 0 && idx < cells.length) {
         endIdx = idx;
-        updateSelectionHighlightIndices(startIdx, endIdx, cells);
+        updateSelectionHighlightRect(startRow, startCol, curRow, curCol, cells);
       }
       if (e && e.cancelable) e.preventDefault();
     }
@@ -931,12 +927,11 @@ function addDayTouchHandlers(el) {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
     if (selecting) {
-      // финальный снэп
       if (e && e.changedTouches && e.changedTouches[0] && cells && colCenters && rowCenters) {
         const t = e.changedTouches[0];
-        const col = nearestIndex(colCenters, t.clientX);
-        const row = nearestIndex(rowCenters, t.clientY);
-        const idx = row * 7 + col;
+        curCol = nearestIndex(colCenters, t.clientX);
+        curRow = nearestIndex(rowCenters, t.clientY);
+        const idx = curRow * 7 + curCol;
         if (idx >= 0 && idx < cells.length) endIdx = idx;
       }
 
@@ -945,12 +940,11 @@ function addDayTouchHandlers(el) {
       disableSwipe = false;
       if (e && e.cancelable) e.preventDefault();
 
-      const dsList = getDsListBetweenIndices(startIdx, endIdx, cells);
+      const dsList = getDsListForRect(startRow, startCol, curRow ?? startRow, curCol ?? startCol, cells);
 
       if (dsList.length >= DRAG_MIN_DATES) {
         openBulkEditModalForDs(dsList);
       } else {
-        // короткое выделение — считаем одиночным тапом по дню старта
         if (!moved && tapTargetDateStr) {
           editDayManually(parseYMDLocal(tapTargetDateStr));
         } else {
@@ -958,7 +952,6 @@ function addDayTouchHandlers(el) {
         }
       }
     } else {
-      // обычный тап/двойной тап
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
@@ -986,6 +979,8 @@ function addDayTouchHandlers(el) {
     tapTargetDateStr = null;
     cells = null; colCenters = null; rowCenters = null;
     startIdx = null; endIdx = null;
+    startRow = null; startCol = null;
+    curRow = null; curCol = null;
   };
 
   el.addEventListener('touchend', finish, { passive: false });
@@ -1001,6 +996,8 @@ function addDayTouchHandlers(el) {
     tapTargetDateStr = null;
     cells = null; colCenters = null; rowCenters = null;
     startIdx = null; endIdx = null;
+    startRow = null; startCol = null;
+    curRow = null; curCol = null;
   });
 }
 
@@ -1127,8 +1124,60 @@ function updateSelectionHighlight() {
   });
 }
 
+function clearSelectionHighlight() {
+  selectionEls.forEach(el => el.classList.remove('range-selected'));
+  selectionEls.clear();
+}
+
+function getDateStringsBetween(a, b) {
+  if (!a || !b) return [];
+  const start = new Date(Math.min(a, b));
+  const end   = new Date(Math.max(a, b));
+  start.setHours(0,0,0,0);
+  end.setHours(0,0,0,0);
+  const out = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(fmtYMDLocal(d)); // ЛОКАЛЬНЫЙ ключ
+  }
+  return out;
+}
+
+// Прямоугольная подсветка по строкам/колонкам
+function updateSelectionHighlightRect(startRow, startCol, curRow, curCol, cells) {
+  clearSelectionHighlight();
+  if (!cells || !cells.length) return;
+  const r1 = Math.min(startRow, curRow), r2 = Math.max(startRow, curRow);
+  const c1 = Math.min(startCol, curCol), c2 = Math.max(startCol, curCol);
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const i = r * 7 + c;
+      const el = cells[i];
+      if (el) {
+        el.classList.add('range-selected');
+        selectionEls.add(el);
+      }
+    }
+  }
+}
+
+// Список дат из прямоугольника
+function getDsListForRect(startRow, startCol, curRow, curCol, cells) {
+  const out = [];
+  if (!cells || !cells.length) return out;
+  const r1 = Math.min(startRow, curRow), r2 = Math.max(startRow, curRow);
+  const c1 = Math.min(startCol, curCol), c2 = Math.max(startCol, curCol);
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const i = r * 7 + c;
+      const ds = cells[i] && cells[i].getAttribute ? cells[i].getAttribute('data-date') : null;
+      if (ds) out.push(ds);
+    }
+  }
+  return out;
+}
+
 // ========================
-// Модалка массового редактирования диапазона
+// Модалки массового редактирования
 // ========================
 function openBulkEditModalForRange() {
   if (!selectionStartDate || !selectionEndDate) return;
@@ -1239,52 +1288,7 @@ function openBulkEditModalForRange() {
   });
 }
 
-function clearSelectionHighlight() {
-  selectionEls.forEach(el => el.classList.remove('range-selected'));
-  selectionEls.clear();
-}
-
-function getDateStringsBetween(a, b) {
-  if (!a || !b) return [];
-  const start = new Date(Math.min(a, b));
-  const end   = new Date(Math.max(a, b));
-  start.setHours(0,0,0,0);
-  end.setHours(0,0,0,0);
-  const out = [];
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    out.push(fmtYMDLocal(d)); // ЛОКАЛЬНЫЙ ключ
-  }
-  return out;
-}
-// Подсветка по индексам (вместо дат) — используется ТОЛЬКО в тач-режиме
-function updateSelectionHighlightIndices(aIdx, bIdx, cells) {
-  clearSelectionHighlight();
-  if (!cells || !cells.length) return;
-  const a = Math.min(aIdx, bIdx);
-  const b = Math.max(aIdx, bIdx);
-  for (let i = a; i <= b; i++) {
-    const el = cells[i];
-    if (el) {
-      el.classList.add('range-selected');
-      selectionEls.add(el);
-    }
-  }
-}
-
-// Список data-date по индексам
-function getDsListBetweenIndices(aIdx, bIdx, cells) {
-  const out = [];
-  if (!cells || !cells.length) return out;
-  const a = Math.min(aIdx, bIdx);
-  const b = Math.max(aIdx, bIdx);
-  for (let i = a; i <= b; i++) {
-    const ds = cells[i] && cells[i].getAttribute ? cells[i].getAttribute('data-date') : null;
-    if (ds) out.push(ds);
-  }
-  return out;
-}
-
-// Диалог массового редактирования для списка дат (без вычисления по календарным датам)
+// Диалог массового редактирования для списка дат (прямоугольник)
 function openBulkEditModalForDs(dsList) {
   if (!dsList || !dsList.length) return;
 
@@ -1380,499 +1384,12 @@ function openBulkEditModalForDs(dsList) {
     queueTgSync('bulk');
   });
 
-  modal.querySelector('#bulk-cancel').addEventListener('click', () => {
-    clearSelectionHighlight();
-    closeModal();
-  });
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      clearSelectionHighlight();
-      closeModal();
-    }
-  });
-}
-
-// Поиск ячейки под пальцем: с приоритетом той же строки (недели)
-function findDayCellAtClientPoint(x, y, preferredRowIdx /* 0..5 или null */) {
-  const cal = document.getElementById('calendar');
-  if (!cal) return null;
-  const r = cal.getBoundingClientRect();
-
-  // Чуть внутрь от краёв контейнера
-  const xi = Math.min(r.right - 2, Math.max(r.left + 2, x));
-  const yi = Math.min(r.bottom - 2, Math.max(r.top + 2, y));
-
-  const probe = (px, py) => {
-    const n = document.elementFromPoint(px, py);
-    return n && n.closest ? n.closest('.day') : null;
-  };
-
-  // 1) Прямо под пальцем
-  let el = probe(xi, yi);
-  if (el) return el;
-
-  // 2) Вся "стопка" под точкой
-  if (document.elementsFromPoint) {
-    const stack = document.elementsFromPoint(xi, yi);
-    el = stack.find(n => n && n.classList && n.classList.contains('day'));
-    if (el) return el;
-  }
-
-  // 3) Горизонтальные «тычки»
-  const H = [1,2,3,4,6,8,10,12,14,16,18,20,24];
-  for (const d of H) {
-    el = probe(xi - d, yi) || probe(xi + d, yi);
-    if (el) return el;
-  }
-
-  // 4) Небольшие вертикальные сдвиги
-  for (const d of [3,5,7,9,12]) {
-    el = probe(xi, yi - d) || probe(xi, yi + d);
-    if (el) return el;
-  }
-
-  // 5) Крайний фолбэк: ближайшая .day по центрам, с приоритетом той же строки
-  const days = cal.querySelectorAll(':scope > .day'); // 42 клетки месяца
-  let best = null, bestScore = Infinity;
-
-  for (let i = 0; i < days.length; i++) {
-    const cell = days[i];
-    const cr = cell.getBoundingClientRect();
-    const cx = (cr.left + cr.right) / 2;
-    const cy = (cr.top + cr.bottom) / 2;
-
-    const row = Math.floor(i / 7); // строка 0..5
-    const rowPenalty = (preferredRowIdx != null && row !== preferredRowIdx) ? 10000 : 0;
-
-    // Вертикали даём больший вес, чтобы держаться той же строки
-    const score = rowPenalty + Math.abs(yi - cy) * 2 + Math.abs(xi - cx);
-
-    if (score < bestScore) { bestScore = score; best = cell; }
-  }
-  return best;
+  modal.querySelector('#bulk-cancel').addEventListener('click', () => { clearSelectionHighlight(); closeModal(); });
+  modal.addEventListener('click', (e) => { if (e.target === modal) { clearSelectionHighlight(); closeModal(); } });
 }
 
 // ========================
-// Сброс ручных изменений
-// ========================
-function resetManualChanges() {
-  if (Object.keys(manualOverrides).length === 0 && Object.keys(manualNotes).length === 0) {
-    alert('Нет ручных изменений для сброса');
-    return;
-  }
-  if (confirm('Вы уверены, что хотите сбросить ВСЕ ручные изменения?')) {
-    manualOverrides = {};
-    manualNotes = {};
-    saveData();
-    renderCalendar();
-    alert('Все ручные изменения сброшены');
-    queueTgSync('reset');
-  }
-}
-
-// ========================
-// Статистика
-// ========================
-function showStatistics() {
-  const currentYear = currentDate.getFullYear();
-  let stats = {
-    sick: { total: 0, work: 0, rest: 0 },
-    businessTrip: { total: 0, work: 0, rest: 0 },
-    vacation: { total: 0, work: 0, rest: 0 }
-  };
-  
-  Object.keys(manualOverrides).forEach(dateStr => {
-    const date = parseYMDLocal(dateStr);
-    if (date.getFullYear() === currentYear) {
-      const status = manualOverrides[dateStr];
-      const autoStatus = calculateAutoStatus(date);
-      if (status === 'sick') {
-        stats.sick.total++;
-        if (isWorkDay(autoStatus)) stats.sick.work++; else stats.sick.rest++;
-      } else if (status === 'business-trip') {
-        stats.businessTrip.total++;
-        if (isWorkDay(autoStatus)) stats.businessTrip.work++; else stats.businessTrip.rest++;
-      } else if (status === 'vacation') {
-        stats.vacation.total++;
-        if (isWorkDay(autoStatus)) stats.vacation.work++; else stats.vacation.rest++;
-      }
-    }
-  });
-  
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px;">
-      <h3 style="margin-bottom: 15px; text-align: center;">Статистика за ${currentYear} год</h3>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #f1c40f;">🟨 Больничные:</h4>
-        <div style="padding: 10px; background: #fffbf0; border-radius: 5px;">
-          Всего: ${stats.sick.total} ${pluralDays(stats.sick.total)}<br>
-          В рабочие дни: ${stats.sick.work} ${pluralDays(stats.sick.work)}<br>
-          В дни отдыха: ${stats.sick.rest} ${pluralDays(stats.sick.rest)}
-        </div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #1abc9c;">🧳 Командировки:</h4>
-        <div style="padding: 10px; background: #f0f9f7; border-radius: 5px;">
-          Всего: ${stats.businessTrip.total} ${pluralDays(stats.businessTrip.total)}<br>
-          В рабочие дни: ${stats.businessTrip.work} ${pluralDays(stats.businessTrip.work)}<br>
-          В дни отдыха: ${stats.businessTrip.rest} ${pluralDays(stats.businessTrip.rest)}
-        </div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #95a5a6;">🏖️ Отпуск:</h4>
-        <div style="padding: 10px; background: #f8f9fa; border-radius: 5px;">
-          Всего: ${stats.vacation.total} ${pluralDays(stats.vacation.total)}<br>
-          В рабочие дни: ${stats.vacation.work} ${pluralDays(stats.vacation.work)}<br>
-          В дни отдыха: ${stats.vacation.rest} ${pluralDays(stats.vacation.rest)}
-        </div>
-      </div>
-      <button id="close-stats" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;">Закрыть</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.querySelector('#close-stats').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
-function calculateAutoStatus(date) {
-  if (!vakhtaStartDate) return 'rest';
-  const dateStart = new Date(date); dateStart.setHours(0,0,0,0);
-  const vakhtaStart = new Date(vakhtaStartDate); vakhtaStart.setHours(0,0,0,0);
-  const diffDays = Math.floor((dateStart - vakhtaStart) / (1000 * 60 * 60 * 24));
-  const cycleDay = ((diffDays % 56) + 56) % 56;
-
-  switch (currentSchedule) {
-    case 'standard':
-      if (cycleDay === 54) return 'plane-from-home';
-      if (cycleDay === 55) return 'train';
-      if (cycleDay === 0)  return 'travel-to';
-      if (cycleDay === 28) return 'travel-from';
-      if (cycleDay === 29) return 'plane-to-home';
-      if (cycleDay >= 1 && cycleDay <= 14) return 'work-day';
-      if (cycleDay >= 15 && cycleDay <= 27) return 'work-night';
-      return 'rest';
-    case 'sakhalin':
-      if (cycleDay === 55) return 'train';
-      if (cycleDay === 0)  return 'travel-to';
-      if (cycleDay === 28) return 'travel-from';
-      if (cycleDay >= 1 && cycleDay <= 14) return 'work-day';
-      if (cycleDay >= 15 && cycleDay <= 27) return 'work-night';
-      return 'rest';
-    case 'standard-day':
-      if (cycleDay === 54) return 'plane-from-home';
-      if (cycleDay === 55) return 'train';
-      if (cycleDay === 0)  return 'travel-to';
-      if (cycleDay === 28) return 'travel-from-day';
-      if (cycleDay === 29) return 'plane-to-home';
-      if (cycleDay >= 1 && cycleDay <= 27) return 'work-day';
-      return 'rest';
-    case 'sakhalin-day':
-      if (cycleDay === 55) return 'train';
-      if (cycleDay === 0)  return 'travel-to';
-      if (cycleDay === 28) return 'travel-from-day';
-      if (cycleDay >= 1 && cycleDay <= 27) return 'work-day';
-      return 'rest';
-    default:
-      return 'rest';
-  }
-}
-function isWorkDay(status) { return ['travel-to','work-day','work-night','travel-from','travel-from-day'].includes(status); }
-
-function pluralDays(n) {
-  const mod10 = n % 10, mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'день';
-  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return 'дня';
-  return 'дней';
-}
-
-// ========================
-// Справка (аккордеон)
-// ========================
-function showHelp() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
-      <h3 style="margin-bottom: 15px; text-align: center;">📋 Справка по календарю вахтовика</h3>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">🎯 Основная логика графика</h4>
-        <p><strong>График 28/28:</strong> 28 дней вахта → 28 дней отдых<br>
-        <strong>Логистика = отдых:</strong> Самолет и поезд считаются днями отдыха<br>
-        <strong>Рабочие дни:</strong> Заезд, дневные/ночные смены, выезд</p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">🎛️ Режимы работы</h4>
-        <p><strong>Стандартный (дневные/ночные смены)</strong> — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-        <p><strong>Сахалинский (дневные/ночные смены)</strong> — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-        <p><strong>Стандартный дневной</strong> — с самолетами; 28 дневных; выезд: день + выезд</p>
-        <p><strong>Сахалинский дневной</strong> — без самолетов; 28 дневных; выезд: день + выезд</p>
-        <p>Активный график подсвечивается зеленым цветом.</p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">✏️ Редактирование дней</h4>
-        <p>
-          • ПК: двойной клик по дню — открыть редактор статуса.<br>
-          • Смартфон: по умолчанию — двойной тап. Можно переключить на один тап: «Режимы вахты» → «Настройки» → «Ручное редактирование даты».
-        </p>
-        <p style="margin-top: 6px;">
-          В редакторе можно назначить: <strong>🟨 Больничный</strong>, <strong>🧳 Командировка</strong>, <strong>🏖️ Отпуск</strong> и т.п.
-          Ручные изменения подсвечиваются оранжевой рамкой и сохраняются автоматически.
-        </p>
-        <p style="margin-top: 8px;">
-          <strong>Массовое редактирование дат:</strong><br>
-          • ПК: Shift + протяжка мышью — выделится диапазон, далее выберите статус.<br>
-          • Смартфон: долго удерживайте (~0.45 с), затем проведите пальцем по датам и отпустите — появится окно массового редактирования.<br>
-          Свайпы листают месяц/год и имеют приоритет.
-        </p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">🗂️ Виды отображения</h4>
-        <p><strong>Годовой вид:</strong> 12 мини‑месяцев на одном экране. Тап по месяцу — переход к месяцу.</p>
-        <p><strong>Месячный вид:</strong> подробные статусы каждого дня, двойной клик — редактор.</p>
-        <p><strong>Переключение:</strong> кнопка «📊 Годовой вид» / «📅 Месячный вид».</p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">📊 Статистика</h4>
-        <p>Показывает число отпусков/командировок/больничных за год и делит их на <em>в рабочие</em> / <em>в дни отдыха</em>.</p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">🔄 Сброс изменений</h4>
-        <p>Удаляет ВСЕ ручные изменения. Основной график вахты сохраняется.</p>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">🔗 Поделиться / Экспорт · Импорт</h4>
-        <p>Экспорт базового/полного графика, импорт, печать месяца/года.</p>
-      </div>
-
-      <div style="margin-bottom: 15px;">
-        <h4 style="color: #3498db; margin-bottom: 10px;">💾 Сохранение данных</h4>
-        <p>Все настройки сохраняются в браузере. При повторном открытии всё восстановится.</p>
-      </div>
-
-      <button id="close-help" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;">Закрыть</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.querySelector('#close-help').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-
-  (function makeCollapsibleHelp() {
-    const headers = modal.querySelectorAll('h4');
-    headers.forEach((h4, idx) => {
-      h4.style.cursor = 'pointer';
-      h4.style.display = 'flex';
-      h4.style.alignItems = 'center';
-      h4.style.justifyContent = 'space-between';
-      const chevron = document.createElement('span');
-      chevron.textContent = '▼';
-      chevron.style.fontSize = '12px';
-      chevron.style.opacity = '0.7';
-      chevron.style.marginLeft = '8px';
-      chevron.style.transition = 'transform .2s ease';
-      h4.appendChild(chevron);
-
-      const contentNodes = [];
-      let el = h4.nextElementSibling;
-      while (el && el.tagName !== 'H4' && el.id !== 'close-help') {
-        contentNodes.push(el);
-        el = el.nextElementSibling;
-      }
-      const setCollapsed = (collapsed) => {
-        contentNodes.forEach(node => node.style.display = collapsed ? 'none' : '');
-        chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-      };
-      setCollapsed(idx !== 0);
-      h4.addEventListener('click', () => {
-        const collapsedNow = contentNodes.length ? contentNodes[0].style.display === 'none' : false;
-        setCollapsed(!collapsedNow);
-      });
-    });
-  })();
-}
-
-// ========================
-// Выбор месяца/года
-// ========================
-function showMonthYearPicker() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 320px;">
-      <h3 style="margin-bottom: 15px; text-align: center;">Выберите месяц и год</h3>
-      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <select id="year-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-          ${generateYearOptions(currentYear)}
-        </select>
-        <select id="month-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-          ${generateMonthOptions(currentMonth)}
-        </select>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <button id="confirm-picker" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px;">OK</button>
-        <button id="cancel-picker" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 5px;">Отмена</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  modal.querySelector('#confirm-picker').addEventListener('click', () => {
-    const yearSelect = modal.querySelector('#year-select');
-    const monthSelect = modal.querySelector('#month-select');
-    currentDate.setFullYear(parseInt(yearSelect.value), parseInt(monthSelect.value), 1);
-    renderCalendar();
-    document.body.removeChild(modal);
-  });
-  modal.querySelector('#cancel-picker').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
-function generateYearOptions(currentYear) {
-  let options = '';
-  for (let year = currentYear - 5; year <= currentYear + 5; year++) {
-    const selected = year === currentYear ? 'selected' : '';
-    options += `<option value="${year}" ${selected}>${year}</option>`;
-  }
-  return options;
-}
-function generateMonthOptions(currentMonth) {
-  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  return months.map((m, i) => `<option value="${i}" ${i===currentMonth?'selected':''}>${m}</option>`).join('');
-}
-
-// ========================
-// Режимы (добавлены настройки жестов)
-// ========================
-function updateScheduleButtonText() {
-  const btn = document.getElementById('schedule-select-btn');
-  if (!btn) return;
-  const texts = {
-    'standard': '📋 Стандартный',
-    'sakhalin': '🏝️ Сахалинский',
-    'standard-day': '☀️ Стандартный дневной',
-    'sakhalin-day': '☀️ Сахалинский дневной'
-  };
-  const currentText = texts[currentSchedule] || 'Режимы вахты';
-  btn.innerHTML = `
-    <div style="font-size: 10px; line-height: 1; margin-bottom: 2px; opacity: .8;">РЕЖИМ ВАХТЫ</div>
-    <div style="font-size: 12px; line-height: 1.1;">${currentText} ▼</div>
-  `;
-  btn.title = `Текущий режим: ${currentText}. Нажмите для изменения`;
-}
-
-function showScheduleSelector() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  modal.innerHTML = `
-    <div style="background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px;">
-      <h3 style="margin-bottom: 20px; text-align: center;">📋 Выберите режим вахты</h3>
-      <div style="margin-bottom: 25px;">
-        <div style="font-size: 14px; color: #7f8c8d; margin-bottom: 10px; text-align: center;">
-          Текущий режим: <strong>${getCurrentScheduleName()}</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-          ${renderScheduleOption('standard', '📋 Стандартный', 'С самолетами, дневные/ночные смены')}
-          ${renderScheduleOption('sakhalin', '🏝️ Сахалинский', 'Без самолетов, дневные/ночные смены')}
-          ${renderScheduleOption('standard-day', '☀️ Стандартный дневной', 'С самолетами, только дневные смены')}
-          ${renderScheduleOption('sakhalin-day', '☀️ Сахалинский дневной', 'Без самолетов, только дневные смены')}
-        </div>
-      </div>
-
-      <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee;">
-        <div style="font-weight:600; margin-bottom:8px;">Настройки</div>
-        <div style="font-size:12px; color:#7f8c8d; margin-bottom:6px;">
-          Ручное редактирование даты (на телефоне):
-        </div>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-            <input type="radio" name="edit-gesture" value="single"> Один тап
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
-            <input type="radio" name="edit-gesture" value="double"> Двойной тап
-          </label>
-        </div>
-        <div style="font-size:12px; color:#7f8c8d; margin-top:6px;">
-          Массовое редактирование дат: долго удерживайте и тяните по датам. Свайпы листают месяц/год и имеют приоритет.
-        </div>
-      </div>
-
-      <button id="close-schedule" style="margin-top:14px; width: 100%; padding: 12px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: 600;">Закрыть</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  modal.querySelectorAll('.schedule-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentSchedule = btn.getAttribute('data-value');
-      saveData();
-      renderCalendar();
-      updateScheduleButtonText();
-      document.body.removeChild(modal);
-      queueTgSync('schedule');
-    });
-  });
-
-  const savedGesture = localStorage.getItem('editGestureMode') || 'double';
-  const radio = modal.querySelector(`input[name="edit-gesture"][value="${savedGesture}"]`);
-  if (radio) radio.checked = true;
-
-  modal.querySelectorAll('input[name="edit-gesture"]').forEach(r => {
-    r.addEventListener('change', (e) => {
-      editGestureMode = e.target.value;
-      localStorage.setItem('editGestureMode', editGestureMode);
-    });
-  });
-
-  modal.querySelector('#close-schedule').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
-function renderScheduleOption(value, title, subtitle) {
-  const active = currentSchedule === value;
-  return `
-    <button class="schedule-option ${active ? 'active-option' : ''}" data-value="${value}"
-      style="padding: 15px; border: 2px solid ${active ? '#27ae60' : '#3498db'}; border-radius: 8px; background: ${active ? '#f8fff9' : 'white'}; text-align: left; cursor: pointer;">
-      <div style="font-weight: bold; color: #2c3e50; margin-bottom: 4px;">${title}</div>
-      <div style="font-size: 12px; color: #7f8c8d;">${subtitle}</div>
-    </button>
-  `;
-}
-
-function getCurrentScheduleName() {
-  const names = {
-    'standard': 'Стандартный',
-    'sakhalin': 'Сахалинский',
-    'standard-day': 'Стандартный дневной',
-    'sakhalin-day': 'Сахалинский дневной'
-  };
-  return names[currentSchedule] || 'Не выбран';
-}
-
-// ========================
-// Заголовки для печати
+// Печать
 // ========================
 function showPrintTitle(title, subtitle) {
   let el = document.getElementById('print-title');
@@ -2161,8 +1678,8 @@ function openShareModal() {
   if (content) {
     content.style.maxHeight = '85vh';
     content.style.overflowY = 'auto';
-    content.style.filter = 'none';           // на всякий случай
-    content.style.backdropFilter = 'none';   // убрать любые размытия
+    content.style.filter = 'none';
+    content.style.backdropFilter = 'none';
   }
 
   // Копирование
@@ -2183,7 +1700,7 @@ function openShareModal() {
     });
   });
 
-  // Импорт (теперь элементы существуют)
+  // Импорт
   modal.querySelector('#apply-import').addEventListener('click', () => {
     const code = modal.querySelector('#import-code').value.trim();
     if (!code) { alert('Вставьте код для импорта'); return; }
@@ -2266,16 +1783,3 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
