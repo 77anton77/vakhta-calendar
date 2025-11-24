@@ -806,12 +806,53 @@ function addDayTouchHandlers(el) {
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
-  let lastHoverDs = null;  // последняя валидная дата под пальцем
-  let startRowIdx = null;  // индекс строки (недели) старта, 0..5
 
-  // НОВОЕ: порог и флаг снятия "замка строки"
-  const ROW_UNLOCK_PX = Math.max(16, Math.round(12 * (window.devicePixelRatio || 1)));
-  let rowLockReleased = false;
+  // геометрия сетки
+  let daysList = null;           // NodeList из 42 .day ячеек
+  let colCenters = null;         // [7] центры X колонок
+  let rowCenters = null;         // [6] центры Y строк
+  let startRowIdx = null;        // 0..5 — строка старта
+
+  // утилита: ближайший индекс к значению v
+  const nearestIndex = (arr, v) => {
+    let best = 0, bestDist = Infinity;
+    for (let i = 0; i < arr.length; i++) {
+      const d = Math.abs(arr[i] - v);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+  };
+
+  // посчитать центры колонок и строк
+  const buildGridMetrics = (hitEl) => {
+    const cal = document.getElementById('calendar');
+    if (!cal) return false;
+    daysList = cal.querySelectorAll(':scope > .day');
+    if (!daysList || daysList.length < 42) return false;
+
+    // индекс стартовой ячейки
+    let startIndex = -1;
+    for (let i = 0; i < daysList.length; i++) if (daysList[i] === hitEl) { startIndex = i; break; }
+    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : 0;
+
+    // центры строк — берём первый столбец каждой строки
+    rowCenters = [];
+    for (let r = 0; r < 6; r++) {
+      const cell = daysList[r * 7];
+      const cr = cell.getBoundingClientRect();
+      rowCenters.push((cr.top + cr.bottom) / 2);
+    }
+
+    // центры колонок — берём клетки из строки старта (или 0‑й строки)
+    const baseRow = Math.min(Math.max(startRowIdx, 0), 5);
+    colCenters = [];
+    for (let c = 0; c < 7; c++) {
+      const cell = daysList[baseRow * 7 + c];
+      const cr = cell.getBoundingClientRect();
+      colCenters.push((cr.left + cr.right) / 2);
+    }
+    return true;
+  };
 
   el.addEventListener('touchstart', (e) => {
     if (currentView !== 'month') return;
@@ -826,27 +867,25 @@ function addDayTouchHandlers(el) {
     startX = t.clientX;
     startY = t.clientY;
 
-    rowLockReleased = false; // НОВОЕ
+    // найти ячейку именно под пальцем
+    const hitEl = (function () {
+      const n = document.elementFromPoint(startX, startY);
+      return n && n.closest ? n.closest('.day') : null;
+    })() || e.currentTarget;
 
-    // ВАЖНО: определяем клетку именно под пальцем (а не e.currentTarget)
-    const hitEl = findDayCellAtClientPoint(t.clientX, t.clientY, null) || e.currentTarget;
     const ds = hitEl && hitEl.getAttribute('data-date');
     if (!ds) return;
 
     tapTargetDateStr = ds;
-    lastHoverDs = ds;
 
-    // приоритет строки старта
-    const daysList = document.querySelectorAll('#calendar > .day');
-    let startIndex = -1;
-    for (let i = 0; i < daysList.length; i++) { if (daysList[i] === hitEl) { startIndex = i; break; } }
-    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : null;
+    // построить метрики сетки
+    if (!buildGridMetrics(hitEl)) return;
 
-    if (longPressTimer) clearTimeout(longPressTimer);
     selecting = false;
     selectionStartDate = parseYMDLocal(ds);
     selectionEndDate   = parseYMDLocal(ds);
 
+    if (longPressTimer) clearTimeout(longPressTimer);
     longPressTimer = setTimeout(() => {
       if (moved) return;
       selecting = true;
@@ -870,26 +909,23 @@ function addDayTouchHandlers(el) {
         moved = true;
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
       }
+      return;
     }
 
-    if (selecting) {
-  // если ушли вертикально дальше порога — снимаем "замок строки"
-  const vShift = Math.abs(t.clientY - startY);
-  if (!rowLockReleased && vShift > ROW_UNLOCK_PX) {
-    rowLockReleased = true;
-  }
+    // Снэп к ближайшей колонке/строке по предрассчитанным центрам
+    if (colCenters && rowCenters && daysList && daysList.length >= 42) {
+      const col = nearestIndex(colCenters, t.clientX);
+      const row = nearestIndex(rowCenters, t.clientY);
+      const idx = row * 7 + col;
+      const cell = daysList[idx];
 
-  const prefRow = rowLockReleased ? null : startRowIdx;
-  const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
-  const ds = dayEl && dayEl.getAttribute('data-date');
-  if (ds) {
-    selectionEndDate = parseYMDLocal(ds);
-    lastHoverDs = ds;
-    updateSelectionHighlight();
-    if (e && e.cancelable) e.preventDefault();
-  }
-}
-
+      const ds = cell && cell.getAttribute ? cell.getAttribute('data-date') : null;
+      if (ds) {
+        selectionEndDate = parseYMDLocal(ds);
+        updateSelectionHighlight();
+        if (e && e.cancelable) e.preventDefault();
+      }
+    }
   }, { passive: false });
 
   const finish = (e) => {
@@ -897,12 +933,15 @@ function addDayTouchHandlers(el) {
 
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
-      const prefRow = rowLockReleased ? null : startRowIdx;
-const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
-
-      let ds = dayEl && dayEl.getAttribute('data-date');
-      if (!ds && lastHoverDs) ds = lastHoverDs;
-      if (ds) selectionEndDate = parseYMDLocal(ds);
+      // финальный снэп
+      if (colCenters && rowCenters && daysList && daysList.length >= 42) {
+        const col = nearestIndex(colCenters, t.clientX);
+        const row = nearestIndex(rowCenters, t.clientY);
+        const idx = row * 7 + col;
+        const cell = daysList[idx];
+        const ds = cell && cell.getAttribute ? cell.getAttribute('data-date') : null;
+        if (ds) selectionEndDate = parseYMDLocal(ds);
+      }
     }
 
     if (selecting) {
@@ -912,7 +951,6 @@ const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
       if (e && e.cancelable) e.preventDefault();
 
       const picked = getDateStringsBetween(selectionStartDate, selectionEndDate);
-
       if (picked.length >= DRAG_MIN_DATES) {
         openBulkEditModalForRange();
       } else {
@@ -947,6 +985,8 @@ const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
     }
 
     tapTargetDateStr = null;
+    // сброс метрик
+    daysList = null; colCenters = null; rowCenters = null; startRowIdx = null;
   };
 
   el.addEventListener('touchend', finish, { passive: false });
@@ -959,8 +999,10 @@ const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
     }
     disableSwipe = false;
     tapTargetDateStr = null;
+    daysList = null; colCenters = null; rowCenters = null; startRowIdx = null;
   });
 }
+
 // Свайпы (месяц/год) — при рисовании диапазона отключены
 function setupSwipeNavigation() {
   const cal = document.getElementById('calendar');
@@ -2086,6 +2128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
