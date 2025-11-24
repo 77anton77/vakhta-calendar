@@ -1469,156 +1469,121 @@ function showHelp() {
     display: flex; justify-content: center; align-items: center; z-index: 1000;
   `;
   modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px;">
-      <h3 style="margin-bottom: 10px; text-align: center;">Справка</h3>
-      <div style="font-size: 14px; color: #444; line-height: 1.5; margin-bottom: 12px;">
-        • Долгое удержание на дате, затем проведите пальцем — прямоугольное выделение дат; отпустите — окно массового редактирования.<br>
-        • Двойной тап (или один — по настройке) — редактирование одного дня.<br>
-        • Свайп по календарю — листает месяц/год.
+    <div style="background: white; padding: 20px; border-radius: 10px; width: 92%; max-width: 560px; max-height: 85vh; overflow-y: auto;">
+      <h3 style="margin:0 0 14px; text-align: center;">📋 Справка по календарю вахтовика</h3>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>🎯 Основная логика графика</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">График 28/28: 28 дней вахта → 28 дней отдых</p>
+        <p style="margin:6px 0;">Логистика = отдых: Самолет и поезд считаются днями отдыха</p>
+        <p style="margin:6px 0;">Рабочие дни: Заезд, дневные/ночные смены, выезд</p>
       </div>
-      <button id="close-help" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 6px;">Закрыть</button>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>🎛️ Режимы работы</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Стандартный (дневные/ночные смены) — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+        <p style="margin:6px 0;">Сахалинский (дневные/ночные смены) — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+        <p style="margin:6px 0;">Стандартный дневной — с самолетами; 28 дневных; выезд: день + выезд</p>
+        <p style="margin:6px 0;">Сахалинский дневной — без самолетов; 28 дневных; выезд: день + выезд</p>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>✏️ Редактирование дней</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">ПК: двойной клик по дню — открыть редактор статуса.</p>
+        <p style="margin:6px 0;">Смартфон: по умолчанию — двойной тап. Можно переключить на один тап: «Режимы вахты» → «Настройки» → «Ручное редактирование даты».</p>
+        <p style="margin:6px 0;">В редакторе можно назначить: 🟨 Больничный, 🧳 Командировка, 🏖️ Отпуск и т.п. Ручные изменения подсвечиваются оранжевой рамкой и сохраняются автоматически.</p>
+        <p style="margin:10px 0 6px; font-weight:600;">Массовое редактирование дат</p>
+        <ul style="margin:6px 0 0 18px; padding:0;">
+          <li style="margin:4px 0;">ПК: Shift + протяжка мышью — выделится диапазон, далее выберите статус.</li>
+          <li style="margin:4px 0;">Смартфон: долго удерживайте (~0.45 с), затем проведите пальцем по датам и отпустите — появится окно массового редактирования.</li>
+          <li style="margin:4px 0;">Свайпы листают месяц/год и имеют приоритет.</li>
+        </ul>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>🗂️ Виды отображения</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Годовой вид: 12 мини‑месяцев на одном экране. Тап по месяцу — переход к месяцу.</p>
+        <p style="margin:6px 0;">Месячный вид: подробные статусы каждого дня, двойной клик — редактор.</p>
+        <p style="margin:6px 0;">Переключение: кнопка «📊 Годовой вид» / «📅 Месячный вид».</p>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>📊 Статистика</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Показывает число отпусков/командировок/больничных за год и делит их на <em>в рабочие</em> / <em>в дни отдыха</em>.</p>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>🔄 Сброс изменений</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Удаляет ВСЕ ручные изменения. Основной график вахты сохраняется.</p>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>🔗 Поделиться / Экспорт · Импорт</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Кнопка «Поделиться» позволяет:</p>
+        <ul style="margin:6px 0 0 18px; padding:0;">
+          <li style="margin:4px 0;">Экспортировать базовый график (дата начала + режим) — короткий код для пересылки;</li>
+          <li style="margin:4px 0;">Экспортировать полный снимок (включая ручные правки) — длинный код;</li>
+          <li style="margin:4px 0;">Импортировать код (заменить всё или применить только базовый график);</li>
+          <li style="margin:4px 0;">Напечатать текущий месяц или весь год (можно «Сохранить как PDF»).</li>
+        </ul>
+        <p style="margin:6px 0;">При печати сохраняется выбранный период: «Печать: текущий месяц» печатает месяц из шапки календаря, «Печать: год» — текущий год. Чтобы распечатать другой период, сначала переключите месяц/год в шапке, затем снова выполните печать.</p>
+      </div>
+
+      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <span>💾 Сохранение данных</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
+      </h4>
+      <div>
+        <p style="margin:6px 0;">Все настройки сохраняются в браузере. При повторном открытии всё восстановится.</p>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <button id="close-help" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 6px;">Закрыть</button>
+      </div>
     </div>
   `;
   document.body.appendChild(modal);
+
+  // Аккордеон: первая секция открыта, остальные — закрыты
+  (function makeCollapsibleHelp() {
+    const container = modal.firstElementChild;
+    const headers = container.querySelectorAll('h4');
+    headers.forEach((h4, idx) => {
+      const chevron = h4.querySelector('.chev');
+      // Собираем все узлы до следующего h4
+      const contentNodes = [];
+      let el = h4.nextElementSibling;
+      while (el && el.tagName !== 'H4' && el.id !== 'close-help') {
+        contentNodes.push(el);
+        el = el.nextElementSibling;
+      }
+      const setCollapsed = (collapsed) => {
+        contentNodes.forEach(node => node.style.display = collapsed ? 'none' : '');
+        if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+      };
+      // первая секция — открыта, остальные — закрыты
+      setCollapsed(idx !== 0);
+      h4.addEventListener('click', () => {
+        const collapsedNow = contentNodes.length ? contentNodes[0].style.display === 'none' : false;
+        setCollapsed(!collapsedNow);
+      });
+    });
+  })();
+
   modal.querySelector('#close-help').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
-// ========================
-// Выбор месяца/года
-// ========================
-function showMonthYearPicker() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth();
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 320px;">
-      <h3 style="margin-bottom: 12px; text-align: center;">Выберите месяц и год</h3>
-      <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-        <select id="year-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-          ${generateYearOptions(currentYear)}
-        </select>
-        <select id="month-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-          ${generateMonthOptions(currentMonth)}
-        </select>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <button id="confirm-picker" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 6px;">OK</button>
-        <button id="cancel-picker" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px;">Отмена</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  modal.querySelector('#confirm-picker').addEventListener('click', () => {
-    const yearSelect = modal.querySelector('#year-select');
-    const monthSelect = modal.querySelector('#month-select');
-    currentDate.setFullYear(parseInt(yearSelect.value), parseInt(monthSelect.value), 1);
-    renderCalendar();
-    document.body.removeChild(modal);
-  });
-  modal.querySelector('#cancel-picker').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
-function generateYearOptions(currentYear) {
-  let options = '';
-  for (let year = currentYear - 5; year <= currentYear + 5; year++) {
-    const selected = year === currentYear ? 'selected' : '';
-    options += `<option value="${year}" ${selected}>${year}</option>`;
-  }
-  return options;
-}
-function generateMonthOptions(currentMonth) {
-  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  return months.map((m, i) => `<option value="${i}" ${i===currentMonth?'selected':''}>${m}</option>`).join('');
-}
-
-// ========================
-// Режимы (селектор)
-// ========================
-function updateScheduleButtonTextSafe() { try { updateScheduleButtonText(); } catch {} }
-
-function renderScheduleOption(value, title, subtitle) {
-  const active = currentSchedule === value;
-  return `
-    <button class="schedule-option ${active ? 'active-option' : ''}" data-value="${value}"
-      style="padding: 12px; border: 2px solid ${active ? '#27ae60' : '#3498db'}; border-radius: 8px; background: ${active ? '#f8fff9' : 'white'}; text-align: left; cursor: pointer; width:100%;">
-      <div style="font-weight:bold; color:#2c3e50; margin-bottom:4px;">${title}</div>
-      <div style="font-size: 12px; color: #7f8c8d;">${subtitle}</div>
-    </button>
-  `;
-}
-function getCurrentScheduleName() {
-  const names = {
-    'standard': 'Стандартный',
-    'sakhalin': 'Сахалинский',
-    'standard-day': 'Стандартный дневной',
-    'sakhalin-day': 'Сахалинский дневной'
-  };
-  return names[currentSchedule] || 'Не выбран';
-}
-function showScheduleSelector() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 420px;">
-      <h3 style="margin-bottom: 12px; text-align: center;">📋 Выберите режим вахты</h3>
-      <div style="font-size: 14px; color: #7f8c8d; margin-bottom: 10px; text-align: center;">
-        Текущий режим: <strong>${getCurrentScheduleName()}</strong>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
-        ${renderScheduleOption('standard', '📋 Стандартный', 'С самолетами, дневные/ночные смены')}
-        ${renderScheduleOption('sakhalin', '🏝️ Сахалинский', 'Без самолетов, дневные/ночные смены')}
-        ${renderScheduleOption('standard-day', '☀️ Стандартный дневной', 'С самолетами, только дневные смены')}
-        ${renderScheduleOption('sakhalin-day', '☀️ Сахалинский дневной', 'Без самолетов, только дневные смены')}
-      </div>
-
-      <div style="border-top:1px solid #eee; padding-top:10px;">
-        <div style="font-weight:600; margin-bottom:6px;">Настройки</div>
-        <div style="font-size:12px; color:#7f8c8d; margin-bottom:6px;">Ручное редактирование даты (на телефоне):</div>
-        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; margin-right:12px;">
-          <input type="radio" name="edit-gesture" value="single"> Один тап
-        </label>
-        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px;">
-          <input type="radio" name="edit-gesture" value="double"> Двойной тап
-        </label>
-      </div>
-
-      <button id="close-schedule" style="margin-top: 12px; width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: 600;">Закрыть</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  modal.querySelectorAll('.schedule-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentSchedule = btn.getAttribute('data-value');
-      saveData();
-      renderCalendar();
-      updateScheduleButtonTextSafe();
-      document.body.removeChild(modal);
-      queueTgSync('schedule');
-    });
-  });
-
-  const savedGesture = localStorage.getItem('editGestureMode') || 'double';
-  const savedRadio = modal.querySelector(`input[name="edit-gesture"][value="${savedGesture}"]`);
-  if (savedRadio) savedRadio.checked = true;
-  modal.querySelectorAll('input[name="edit-gesture"]').forEach(r => {
-    r.addEventListener('change', (e) => {
-      editGestureMode = e.target.value;
-      localStorage.setItem('editGestureMode', editGestureMode);
-    });
-  });
-
-  modal.querySelector('#close-schedule').addEventListener('click', () => document.body.removeChild(modal));
   modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
@@ -2057,6 +2022,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
