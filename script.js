@@ -353,19 +353,34 @@ function initCalendar() {
   setupSwipeNavigation();
   updateLegendVisibility();
   updateScheduleButtonText();
-  addTgTestButton();
+  ensureActionsBar();   // ← добавь
+  addTgTestButton();    // ← уже было
   processPrintParams();
 }
 
+
 function initTelegramApp() {
   if (window.Telegram && Telegram.WebApp) {
-    Telegram.WebApp.expand();
-    Telegram.WebApp.setHeaderColor('#2c3e50');
-    Telegram.WebApp.setBackgroundColor('#1e3c72');
-    Telegram.WebApp.BackButton.show();
-    Telegram.WebApp.BackButton.onClick(() => Telegram.WebApp.close());
+    try {
+      Telegram.WebApp.ready(); // важно
+      Telegram.WebApp.expand();
+      Telegram.WebApp.setHeaderColor('#2c3e50');
+      Telegram.WebApp.setBackgroundColor('#1e3c72');
+      Telegram.WebApp.BackButton.show();
+      Telegram.WebApp.BackButton.onClick(() => Telegram.WebApp.close());
+      // Диагностика
+      console.log('[TG] WebApp OK:', {
+        platform: Telegram.WebApp.platform,
+        version: Telegram.WebApp.version
+      });
+    } catch (e) {
+      console.warn('[TG] initTelegramApp error:', e);
+    }
+  } else {
+    console.log('[TG] WebApp not detected (открыто не из бота)');
   }
 }
+
 
 function setupEventListeners() {
   document.addEventListener('contextmenu', (e) => {
@@ -2206,19 +2221,59 @@ function sendTgSnapshot(reason) {
   } catch {}
 }
 function addTgTestButton() {
-  if (!isTGWebApp()) return;
-  const actions = document.querySelector('.actions');
+  const actions = ensureActionsBar();
   if (!actions || actions.querySelector('#tg-test-sync')) return;
+
+  const inTG = !!(window.Telegram && Telegram.WebApp);
+  const force = /(?:\\?|&)tgtest=1\\b/.test(location.search); // форс-показ в браузере
+  if (!inTG && !force) return; // по умолчанию видна только в TG WebApp
+
+  // Укажи username твоего бота (без @) — для deep-link из браузера
+  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← замени на своего
+
   const btn = document.createElement('button');
   btn.id = 'tg-test-sync';
-  btn.style.background = '#6c757d';
-  btn.title = 'Проверка связи с ботом';
-  btn.textContent = 'Тест синхронизации (TG)';
+  btn.style.cssText = 'padding:8px 10px; background:#6c757d; color:#fff; border:none; border-radius:6px; cursor:pointer;';
+  btn.title = inTG ? 'Проверка связи с ботом (WebApp)' : 'Эмуляция из браузера (deep-link)';
+  btn.textContent = inTG ? 'Тест синхронизации (TG)' : 'Тест синхронизации (эмуляция)';
+
   btn.addEventListener('click', () => {
-    sendTgSnapshot('manual-test');
-    alert('Отправлено в бота: snapshot (manual-test). Проверьте чат бота.');
+    try {
+      const payload = buildExportPayload(true);
+      const envelope = { kind: 'snapshot', data: payload, reason: 'manual-test' };
+
+      if (inTG) {
+        Telegram.WebApp.sendData(JSON.stringify(envelope));
+        alert('Отправлено в бота через WebApp.sendData. Проверьте чат бота.');
+      } else {
+        // fallback: deep-link в /start с кодом
+        const code = buildExportCode(true);
+        const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
+        window.open(url, '_blank');
+      }
+    } catch (e) {
+      alert('Ошибка теста: ' + (e && e.message ? e.message : e));
+    }
   });
+
   actions.prepend(btn);
+}
+
+function ensureActionsBar() {
+  let actions = document.querySelector('.actions');
+  if (!actions) {
+    const container = document.querySelector('.container') || document.body;
+    const controls = document.querySelector('.controls');
+    actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin:8px 0;';
+    if (controls && controls.parentNode) {
+      controls.parentNode.insertBefore(actions, controls.nextSibling);
+    } else {
+      container.prepend(actions);
+    }
+  }
+  return actions;
 }
 
 // ========================
@@ -2231,6 +2286,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
