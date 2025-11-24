@@ -490,15 +490,17 @@ function renderCalendar() {
 
   const controls = document.querySelector('.controls');
 
-  if (currentView === 'year') {
-    dayHeaders.forEach(h => h.style.display = 'none');
-    calendarEl.classList.add('year-mode');
-    if (controls) controls.classList.add('hide-month-nav'));
-    const oldYear = calendarEl.querySelector('.year-view');
-    if (oldYear) oldYear.remove();
-    renderYearView();
-    return;
-  }
+ if (currentView === 'year') {
+  dayHeaders.forEach(h => h.style.display = 'none');
+  calendarEl.classList.add('year-mode');
+  if (controls) controls.classList.add('hide-month-nav'); // фикс: убрана лишняя ')'
+  const oldYear = calendarEl.querySelector('.year-view');
+  if (oldYear) oldYear.remove();
+  renderYearView();
+  return;
+}
+
+
 
   calendarEl.classList.remove('year-mode');
   dayHeaders.forEach(h => h.style.display = 'grid');
@@ -2332,3 +2334,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
