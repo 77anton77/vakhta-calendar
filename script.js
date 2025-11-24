@@ -350,14 +350,29 @@ function initCalendar() {
   updateLegendVisibility();
   updateScheduleButtonText();
   ensureActionsBar();   // гарантируем панель для тест-кнопок
-  addTgTestButton();    // рисуем тест-кнопки TG
+  addTgTestButton();    // рисуем тест‑кнопки TG
   processPrintParams();
   showDebugBanner();    // маленький бейдж диагностики
 }
 
+// Улучшенный детектор WebApp: объект или hash-параметры
+function isTelegramWebApp() {
+  try {
+    if (window.Telegram && Telegram.WebApp) return true;
+    const h = String(location.hash || '');
+    if (/tgwebapp/i.test(h)) return true;
+    if (/tgwebappdata/i.test(h)) return true;
+    if (/tgwebappversion/i.test(h)) return true;
+    if (/tgwebappthemeparams/i.test(h)) return true;
+    return false;
+  } catch { return false; }
+}
+
 function initTelegramApp() {
-  if (window.Telegram && Telegram.WebApp) {
-    try {
+  try {
+    const inTG = isTelegramWebApp();
+
+    if (window.Telegram && Telegram.WebApp) {
       Telegram.WebApp.ready();
       Telegram.WebApp.expand();
       Telegram.WebApp.setHeaderColor('#2c3e50');
@@ -365,11 +380,14 @@ function initTelegramApp() {
       Telegram.WebApp.BackButton.show();
       Telegram.WebApp.BackButton.onClick(() => Telegram.WebApp.close());
       console.log('[TG] WebApp OK:', { platform: Telegram.WebApp.platform, version: Telegram.WebApp.version });
-    } catch (e) {
-      console.warn('[TG] initTelegramApp error:', e);
+    } else if (inTG) {
+      // WebApp распознан по hash — объект может отсутствовать в некоторых клиентах
+      console.log('[TG] WebApp detected via hash (no window.Telegram.WebApp).');
+    } else {
+      console.log('[TG] WebApp not detected (открыто не из бота)');
     }
-  } else {
-    console.log('[TG] WebApp not detected (открыто не из бота)');
+  } catch (e) {
+    console.warn('[TG] initTelegramApp error:', e);
   }
 }
 
@@ -475,7 +493,7 @@ function renderCalendar() {
   if (currentView === 'year') {
     dayHeaders.forEach(h => h.style.display = 'none');
     calendarEl.classList.add('year-mode');
-    if (controls) controls.classList.add('hide-month-nav');
+    if (controls) controls.classList.add('hide-month-nav'));
     const oldYear = calendarEl.querySelector('.year-view');
     if (oldYear) oldYear.remove();
     renderYearView();
@@ -1922,10 +1940,6 @@ function ensureYearThenPrint() {
 // ========================
 // Печать/Экспорт/Импорт
 // ========================
-function isTelegramWebApp() {
-  try { return !!(window.Telegram && Telegram.WebApp); } catch { return false; }
-}
-
 function tryPrint(kind /* 'month'|'year' */) {
   const inTG = isTelegramWebApp();
   let printed = false;
@@ -1944,7 +1958,7 @@ function openExternalPrint(kind) {
   if (d) url.searchParams.set('d', d);
   const href = url.toString();
   try {
-    if (isTelegramWebApp()) Telegram.WebApp.openLink(href);
+    if (isTelegramWebApp() && window.Telegram && Telegram.WebApp) Telegram.WebApp.openLink(href);
     else window.open(href, '_blank');
   } catch {
     window.location.href = href;
@@ -2202,7 +2216,8 @@ function openShareModal() {
 // ========================
 let tgSyncTimer = null;
 function isTGWebApp() {
-  try { return !!(window.Telegram && Telegram.WebApp); } catch { return false; }
+  // используем тот же детектор
+  return isTelegramWebApp();
 }
 function queueTgSync(reason) {
   if (!isTGWebApp()) return;
@@ -2214,7 +2229,12 @@ function sendTgSnapshot(reason) {
     const payload = buildExportPayload(true);
     const envelope = { kind: 'snapshot', data: payload, reason: reason || '' };
     console.log('[TG] sendData:', envelope);
-    if (isTGWebApp()) Telegram.WebApp.sendData(JSON.stringify(envelope));
+    if (window.Telegram && Telegram.WebApp) {
+      Telegram.WebApp.sendData(JSON.stringify(envelope));
+    } else {
+      // клиент без объекта WebApp — пропускаем (fallback через deep-link вручную)
+      console.warn('[TG] WebApp object not available; use deep-link button.');
+    }
   } catch (e) { console.warn('[TG] sendData error', e); }
 }
 
@@ -2243,7 +2263,7 @@ function addTgTestButton() {
   const old = actions.querySelectorAll('.tg-test-btn');
   old.forEach(b => b.remove());
 
-  // 1) Кнопка отправки через WebApp (только внутри Telegram WebApp)
+  // 1) Кнопка отправки через WebApp (если объект доступен)
   const btnSend = document.createElement('button');
   btnSend.className = 'tg-test-btn';
   btnSend.textContent = 'TG: sendData (snapshot)';
@@ -2256,7 +2276,7 @@ function addTgTestButton() {
         Telegram.WebApp.sendData(JSON.stringify(envelope));
         alert('Отправлено через Telegram.WebApp.sendData. Проверьте чат бота и логи web_app_data.');
       } else {
-        alert('Telegram.WebApp не обнаружен (страница открыта не как WebApp)');
+        alert('Telegram.WebApp не обнаружен (страница открыта не как WebApp или клиент без объекта). Используйте нижнюю кнопку.');
       }
     } catch (e) {
       alert('Ошибка sendData: ' + (e && e.message ? e.message : e));
@@ -2290,10 +2310,13 @@ function addTgTestButton() {
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
   try {
+    const hasTg = !!window.Telegram;
+    const hasWA = !!(window.Telegram && window.Telegram.WebApp);
+    const inTG = isTelegramWebApp();
+    const hash = (location.hash || '').slice(0, 80);
+
     const div = document.createElement('div');
-    const inTG = !!(window.Telegram && Telegram.WebApp);
-    const tgtest = /(?:\?|&)tgtest=1\b/.test(location.search);
-    div.textContent = `TG:${inTG ? 'YES' : 'NO'} | tgtest:${tgtest ? '1' : '0'} | path:${location.pathname}`;
+    div.textContent = `TG:${inTG ? 'YES' : 'NO'} | obj:${hasWA ? 'YES' : (hasTg ? 'tg-only' : 'no')} | hash:${hash}`;
     div.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:2000;background:#000c;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 system-ui';
     document.body.appendChild(div);
   } catch {}
@@ -2309,4 +2332,3 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
