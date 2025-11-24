@@ -1348,6 +1348,79 @@ function openBulkEditModalForDs(dsList) {
   modal.querySelector('#bulk-cancel').addEventListener('click', () => { clearSelectionHighlight(); closeModal(); });
   modal.addEventListener('click', (e) => { if (e.target === modal) { clearSelectionHighlight(); closeModal(); } });
 }
+// Показ статистики за текущий год (по ручным правкам)
+function showStatistics() {
+  const currentYear = currentDate.getFullYear();
+  // Собираем только по текущему году
+  let stats = {
+    sick:          { total: 0, work: 0, rest: 0 },
+    businessTrip:  { total: 0, work: 0, rest: 0 },
+    vacation:      { total: 0, work: 0, rest: 0 }
+  };
+
+  Object.keys(manualOverrides).forEach(dateStr => {
+    const d = parseYMDLocal(dateStr);
+    if (d.getFullYear() !== currentYear) return;
+    const manual = manualOverrides[dateStr];           // что поставили вручную
+    const auto   = calculateAutoStatus(d);             // что было бы по графику
+    const onWork = isWorkDay(auto);
+
+    if (manual === 'sick') {
+      stats.sick.total++;
+      onWork ? stats.sick.work++ : stats.sick.rest++;
+    } else if (manual === 'business-trip') {
+      stats.businessTrip.total++;
+      onWork ? stats.businessTrip.work++ : stats.businessTrip.rest++;
+    } else if (manual === 'vacation') {
+      stats.vacation.total++;
+      onWork ? stats.vacation.work++ : stats.vacation.rest++;
+    }
+  });
+
+  // Модалка
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 1000;
+  `;
+  modal.innerHTML = `
+    <div style="background:#fff; padding:20px; border-radius:10px; width:92%; max-width:400px;">
+      <h3 style="margin-bottom: 15px; text-align:center;">Статистика за ${currentYear} год</h3>
+
+      <div style="margin-bottom: 15px;">
+        <h4 style="margin-bottom: 10px; color: #f1c40f;">🟨 Больничные</h4>
+        <div style="padding:10px; background:#fffbf0; border-radius:5px;">
+          Всего: ${stats.sick.total} ${pluralDays(stats.sick.total)}<br>
+          В рабочие дни: ${stats.sick.work} ${pluralDays(stats.sick.work)}<br>
+          В дни отдыха: ${stats.sick.rest} ${pluralDays(stats.sick.rest)}
+        </div>
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <h4 style="margin-bottom: 10px; color: #1abc9c;">🧳 Командировки</h4>
+        <div style="padding:10px; background:#f0f9f7; border-radius:5px;">
+          Всего: ${stats.businessTrip.total} ${pluralDays(stats.businessTrip.total)}<br>
+          В рабочие дни: ${stats.businessTrip.work} ${pluralDays(stats.businessTrip.work)}<br>
+          В дни отдыха: ${stats.businessTrip.rest} ${pluralDays(stats.businessTrip.rest)}
+        </div>
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <h4 style="margin-bottom: 10px; color: #95a5a6;">🏖️ Отпуск</h4>
+        <div style="padding:10px; background:#f8f9fa; border-radius:5px;">
+          Всего: ${stats.vacation.total} ${pluralDays(stats.vacation.total)}<br>
+          В рабочие дни: ${stats.vacation.work} ${pluralDays(stats.vacation.work)}<br>
+          В дни отдыха: ${stats.vacation.rest} ${pluralDays(stats.vacation.rest)}
+        </div>
+      </div>
+
+      <button id="close-stats" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:5px;">Закрыть</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('#close-stats').addEventListener('click', () => document.body.removeChild(modal));
+  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+}
 
 // ========================
 // Статистика
@@ -2236,3 +2309,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
