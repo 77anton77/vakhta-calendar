@@ -1587,6 +1587,145 @@ function showHelp() {
   modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
 }
 
+
+// ========================
+// Выбор месяца/года
+// ========================
+function showMonthYearPicker() {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 1000;
+  `;
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 320px;">
+      <h3 style="margin-bottom: 12px; text-align: center;">Выберите месяц и год</h3>
+      <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+        <select id="year-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+          ${generateYearOptions(currentYear)}
+        </select>
+        <select id="month-select" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+          ${generateMonthOptions(currentMonth)}
+        </select>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button id="confirm-picker" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 6px;">OK</button>
+        <button id="cancel-picker" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 6px;">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#confirm-picker').addEventListener('click', () => {
+    const yearSelect = modal.querySelector('#year-select');
+    const monthSelect = modal.querySelector('#month-select');
+    currentDate.setFullYear(parseInt(yearSelect.value), parseInt(monthSelect.value), 1);
+    renderCalendar();
+    document.body.removeChild(modal);
+  });
+  modal.querySelector('#cancel-picker').addEventListener('click', () => document.body.removeChild(modal));
+  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+}
+
+function generateYearOptions(currentYear) {
+  let options = '';
+  for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+    const selected = year === currentYear ? 'selected' : '';
+    options += `<option value="${year}" ${selected}>${year}</option>`;
+  }
+  return options;
+}
+function generateMonthOptions(currentMonth) {
+  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  return months.map((m, i) => `<option value="${i}" ${i===currentMonth?'selected':''}>${m}</option>`).join('');
+}
+
+// ========================
+// Режимы (селектор)
+// ========================
+function updateScheduleButtonTextSafe() { try { updateScheduleButtonText(); } catch {} }
+
+function renderScheduleOption(value, title, subtitle) {
+  const active = currentSchedule === value;
+  return `
+    <button class="schedule-option ${active ? 'active-option' : ''}" data-value="${value}"
+      style="padding: 12px; border: 2px solid ${active ? '#27ae60' : '#3498db'}; border-radius: 8px; background: ${active ? '#f8fff9' : 'white'}; text-align: left; cursor: pointer; width:100%;">
+      <div style="font-weight:bold; color:#2c3e50; margin-bottom:4px;">${title}</div>
+      <div style="font-size: 12px; color: #7f8c8d;">${subtitle}</div>
+    </button>
+  `;
+}
+function getCurrentScheduleName() {
+  const names = {
+    'standard': 'Стандартный',
+    'sakhalin': 'Сахалинский',
+    'standard-day': 'Стандартный дневной',
+    'sakhalin-day': 'Сахалинский дневной'
+  };
+  return names[currentSchedule] || 'Не выбран';
+}
+function showScheduleSelector() {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 1000;
+  `;
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 420px;">
+      <h3 style="margin-bottom: 12px; text-align: center;">📋 Выберите режим вахты</h3>
+      <div style="font-size: 14px; color: #7f8c8d; margin-bottom: 10px; text-align: center;">
+        Текущий режим: <strong>${getCurrentScheduleName()}</strong>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
+        ${renderScheduleOption('standard', '📋 Стандартный', 'С самолетами, дневные/ночные смены')}
+        ${renderScheduleOption('sakhalin', '🏝️ Сахалинский', 'Без самолетов, дневные/ночные смены')}
+        ${renderScheduleOption('standard-day', '☀️ Стандартный дневной', 'С самолетами, только дневные смены')}
+        ${renderScheduleOption('sakhalin-day', '☀️ Сахалинский дневной', 'Без самолетов, только дневные смены')}
+      </div>
+
+      <div style="border-top:1px solid #eee; padding-top:10px;">
+        <div style="font-weight:600; margin-bottom:6px;">Настройки</div>
+        <div style="font-size:12px; color:#7f8c8d; margin-bottom:6px;">Ручное редактирование даты (на телефоне):</div>
+        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; margin-right:12px;">
+          <input type="radio" name="edit-gesture" value="single"> Один тап
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px;">
+          <input type="radio" name="edit-gesture" value="double"> Двойной тап
+        </label>
+      </div>
+
+      <button id="close-schedule" style="margin-top: 12px; width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: 600;">Закрыть</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll('.schedule-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentSchedule = btn.getAttribute('data-value');
+      saveData();
+      renderCalendar();
+      updateScheduleButtonTextSafe();
+      document.body.removeChild(modal);
+      queueTgSync('schedule');
+    });
+  });
+
+  const savedGesture = localStorage.getItem('editGestureMode') || 'double';
+  const savedRadio = modal.querySelector(`input[name="edit-gesture"][value="${savedGesture}"]`);
+  if (savedRadio) savedRadio.checked = true;
+  modal.querySelectorAll('input[name="edit-gesture"]').forEach(r => {
+    r.addEventListener('change', (e) => {
+      editGestureMode = e.target.value;
+      localStorage.setItem('editGestureMode', editGestureMode);
+    });
+  });
+
+  modal.querySelector('#close-schedule').addEventListener('click', () => document.body.removeChild(modal));
+  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+}
+
 // ========================
 // Сброс ручных изменений
 // ========================
@@ -2022,8 +2161,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
-
 
 
 
