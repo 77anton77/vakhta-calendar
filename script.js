@@ -1840,18 +1840,56 @@ function copyText(text) {
 }
 
 function openShareModal() {
+  // Удалим любые "blur"-классы, если такие навешиваются где-то в CSS/JS
+  try {
+    document.body.classList.forEach(c => {
+      if (/blur|frost|glass/i.test(c)) document.body.classList.remove(c);
+    });
+    const cont = document.querySelector('.container');
+    if (cont) {
+      cont.classList.forEach(c => { if (/blur|frost|glass/i.test(c)) cont.classList.remove(c); });
+    }
+  } catch {}
+
+  // Помощники: сохранить/сбросить inline-стили с !important
+  const saveAndDisableBlur = (el) => {
+    if (!el) return null;
+    const prev = {
+      filter: el.style.filter || '',
+      backdrop: el.style.backdropFilter || '',
+      webkitBackdrop: el.style.webkitBackdropFilter || ''
+    };
+    el.style.setProperty('filter', 'none', 'important');
+    el.style.setProperty('backdrop-filter', 'none', 'important');
+    el.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+    return prev;
+  };
+  const restoreBlur = (el, prev) => {
+    if (!el || !prev) return;
+    if (prev.filter) el.style.filter = prev.filter; else el.style.removeProperty('filter');
+    if (prev.backdrop) el.style.backdropFilter = prev.backdrop; else el.style.removeProperty('backdrop-filter');
+    if (prev.webkitBackdrop) el.style.webkitBackdropFilter = prev.webkitBackdrop; else el.style.removeProperty('-webkit-backdrop-filter');
+  };
+
+  // Выключим blur у фона (контейнер/календарь/тело) на время модалки
+  const bodyPrev = saveAndDisableBlur(document.body);
+  const contEl = document.querySelector('.container');
+  const contPrev = saveAndDisableBlur(contEl);
+  const calEl = document.getElementById('calendar');
+  const calPrev = saveAndDisableBlur(calEl);
+
   const modal = document.createElement('div');
   modal.style.cssText = `
     position: fixed; inset: 0; background: rgba(0,0,0,.5);
     display:flex; align-items:center; justify-content:center; z-index:1000;
-    filter:none; backdrop-filter:none;
+    filter:none; backdrop-filter:none; -webkit-backdrop-filter:none;
   `;
 
   const basicCode = buildExportCode(false);
   const fullCode  = buildExportCode(true);
 
   modal.innerHTML = `
-    <div id="share-content" style="background:#fff; padding:16px; border-radius:10px; width:92%; max-width:560px; filter:none;">
+    <div id="share-content" style="background:#fff; padding:16px; border-radius:10px; width:92%; max-width:560px;">
       <h3 style="text-align:center; margin-bottom:12px;">Поделиться / Экспорт · Импорт</h3>
 
       <div style="display:flex; flex-direction:column; gap:14px;">
@@ -1914,20 +1952,38 @@ function openShareModal() {
   `;
   document.body.appendChild(modal);
 
+  // Жёстко вырубаем blur на оверлее и контенте (включая Safari)
+  modal.style.setProperty('filter', 'none', 'important');
+  modal.style.setProperty('backdrop-filter', 'none', 'important');
+  modal.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+
   const content = modal.querySelector('#share-content');
   if (content) {
     content.style.maxHeight = '85vh';
     content.style.overflowY = 'auto';
-    content.style.filter = 'none';
-    content.style.backdropFilter = 'none';
+    content.style.setProperty('filter', 'none', 'important');
+    content.style.setProperty('backdrop-filter', 'none', 'important');
+    content.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
   }
 
-  const safeClose = () => { try { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); } catch {} };
+  // Безопасное закрытие — восстанавливаем фон
+  const safeClose = () => {
+    try {
+      restoreBlur(document.body, bodyPrev);
+      restoreBlur(contEl, contPrev);
+      restoreBlur(calEl, calPrev);
+      if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+    } catch {}
+  };
+
   modal.addEventListener('click', (e) => { if (e.target === modal) safeClose(); });
 
   const closeBtn = modal.querySelector('#close-share');
-  if (closeBtn) closeBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); safeClose(); });
+  if (closeBtn) closeBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation(); safeClose();
+  });
 
+  // Копирование
   const basicCopied = modal.querySelector('#basic-copied');
   modal.querySelector('#copy-basic').addEventListener('click', () => {
     const ta = modal.querySelector('#export-basic');
@@ -1935,7 +1991,6 @@ function openShareModal() {
       if (basicCopied) { basicCopied.style.display = 'inline'; setTimeout(() => basicCopied.style.display = 'none', 1500); }
     });
   });
-
   const fullCopied = modal.querySelector('#full-copied');
   modal.querySelector('#copy-full').addEventListener('click', () => {
     const ta = modal.querySelector('#export-full');
@@ -1944,6 +1999,7 @@ function openShareModal() {
     });
   });
 
+  // Импорт
   modal.querySelector('#apply-import').addEventListener('click', () => {
     const code = modal.querySelector('#import-code').value.trim();
     if (!code) { alert('Вставьте код для импорта'); return; }
@@ -1974,9 +2030,11 @@ function openShareModal() {
     queueTgSync('import');
   });
 
+  // Печать
   modal.querySelector('#print-month').addEventListener('click', () => { safeClose(); tryPrint('month'); });
   modal.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
 }
+
 
 // ========================
 // Автосинхронизация (TG)
@@ -2023,3 +2081,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
