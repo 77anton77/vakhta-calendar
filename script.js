@@ -801,19 +801,22 @@ function editDayManually(date) {
 // ========================
 // Массовое редактирование (тач + ПК) — с фиксом старта "под пальцем" и локальными датами
 // ========================
+// ========================
+// Массовое редактирование (тач) — привязка к сетке по индексам (0..41)
+// ========================
 function addDayTouchHandlers(el) {
   let touchStartTime = 0;
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
 
-  // геометрия сетки
-  let daysList = null;           // NodeList из 42 .day ячеек
-  let colCenters = null;         // [7] центры X колонок
-  let rowCenters = null;         // [6] центры Y строк
-  let startRowIdx = null;        // 0..5 — строка старта
+  // Снимок ячеек на момент жеста
+  let cells = null;        // Array<HTMLElement> длиной 42
+  let colCenters = null;   // [7] центры X
+  let rowCenters = null;   // [6] центры Y
+  let startIdx = null;     // 0..41
+  let endIdx = null;       // 0..41
 
-  // утилита: ближайший индекс к значению v
   const nearestIndex = (arr, v) => {
     let best = 0, bestDist = Infinity;
     for (let i = 0; i < arr.length; i++) {
@@ -823,31 +826,27 @@ function addDayTouchHandlers(el) {
     return best;
   };
 
-  // посчитать центры колонок и строк
-  const buildGridMetrics = (hitEl) => {
-    const cal = document.getElementById('calendar');
-    if (!cal) return false;
-    daysList = cal.querySelectorAll(':scope > .day');
-    if (!daysList || daysList.length < 42) return false;
+  const buildGrid = (hitEl) => {
+    const list = Array.from(document.querySelectorAll('#calendar > .day'));
+    if (list.length < 42) return false;
+    cells = list;
 
-    // индекс стартовой ячейки
-    let startIndex = -1;
-    for (let i = 0; i < daysList.length; i++) if (daysList[i] === hitEl) { startIndex = i; break; }
-    startRowIdx = startIndex >= 0 ? Math.floor(startIndex / 7) : 0;
+    // найти индекс hitEl
+    startIdx = list.indexOf(hitEl);
+    if (startIdx < 0) startIdx = 0;
+    const startRow = Math.floor(startIdx / 7);
 
-    // центры строк — берём первый столбец каждой строки
+    // центры строк (берём первый столбец каждой строки)
     rowCenters = [];
     for (let r = 0; r < 6; r++) {
-      const cell = daysList[r * 7];
+      const cell = list[r * 7];
       const cr = cell.getBoundingClientRect();
       rowCenters.push((cr.top + cr.bottom) / 2);
     }
-
-    // центры колонок — берём клетки из строки старта (или 0‑й строки)
-    const baseRow = Math.min(Math.max(startRowIdx, 0), 5);
+    // центры колонок (берём по строке старта)
     colCenters = [];
     for (let c = 0; c < 7; c++) {
-      const cell = daysList[baseRow * 7 + c];
+      const cell = list[startRow * 7 + c];
       const cr = cell.getBoundingClientRect();
       colCenters.push((cr.left + cr.right) / 2);
     }
@@ -867,21 +866,23 @@ function addDayTouchHandlers(el) {
     startX = t.clientX;
     startY = t.clientY;
 
-    // найти ячейку именно под пальцем
-    const hitEl = (function () {
+    // Ячейка именно под пальцем (или текущая ячейка)
+    const hit = (function () {
       const n = document.elementFromPoint(startX, startY);
       return n && n.closest ? n.closest('.day') : null;
     })() || e.currentTarget;
 
-    const ds = hitEl && hitEl.getAttribute('data-date');
+    const ds = hit && hit.getAttribute('data-date');
     if (!ds) return;
-
     tapTargetDateStr = ds;
 
-    // построить метрики сетки
-    if (!buildGridMetrics(hitEl)) return;
+    // подготовить сетку
+    if (!buildGrid(hit)) return;
 
+    // старт диапазона по индексам
+    endIdx = startIdx;
     selecting = false;
+
     selectionStartDate = parseYMDLocal(ds);
     selectionEndDate   = parseYMDLocal(ds);
 
@@ -891,13 +892,13 @@ function addDayTouchHandlers(el) {
       selecting = true;
       disableSwipe = true;
       document.body.classList.add('range-selecting');
-      updateSelectionHighlight();
+      updateSelectionHighlightIndices(startIdx, endIdx, cells);
     }, LONG_PRESS_MS);
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
     if (!tapTargetDateStr) return;
-    const t = e.touches[0];
+    const t = e.touches && e.touches[0];
     if (!t) return;
 
     const dx = t.clientX - startX;
@@ -912,48 +913,44 @@ function addDayTouchHandlers(el) {
       return;
     }
 
-    // Снэп к ближайшей колонке/строке по предрассчитанным центрам
-    if (colCenters && rowCenters && daysList && daysList.length >= 42) {
+    // Снэп к ближайшей колонке/строке
+    if (cells && colCenters && rowCenters) {
       const col = nearestIndex(colCenters, t.clientX);
       const row = nearestIndex(rowCenters, t.clientY);
       const idx = row * 7 + col;
-      const cell = daysList[idx];
 
-      const ds = cell && cell.getAttribute ? cell.getAttribute('data-date') : null;
-      if (ds) {
-        selectionEndDate = parseYMDLocal(ds);
-        updateSelectionHighlight();
-        if (e && e.cancelable) e.preventDefault();
+      if (idx !== endIdx && idx >= 0 && idx < cells.length) {
+        endIdx = idx;
+        updateSelectionHighlightIndices(startIdx, endIdx, cells);
       }
+      if (e && e.cancelable) e.preventDefault();
     }
   }, { passive: false });
 
   const finish = (e) => {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 
-    if (selecting && e && e.changedTouches && e.changedTouches[0]) {
-      const t = e.changedTouches[0];
+    if (selecting) {
       // финальный снэп
-      if (colCenters && rowCenters && daysList && daysList.length >= 42) {
+      if (e && e.changedTouches && e.changedTouches[0] && cells && colCenters && rowCenters) {
+        const t = e.changedTouches[0];
         const col = nearestIndex(colCenters, t.clientX);
         const row = nearestIndex(rowCenters, t.clientY);
         const idx = row * 7 + col;
-        const cell = daysList[idx];
-        const ds = cell && cell.getAttribute ? cell.getAttribute('data-date') : null;
-        if (ds) selectionEndDate = parseYMDLocal(ds);
+        if (idx >= 0 && idx < cells.length) endIdx = idx;
       }
-    }
 
-    if (selecting) {
       selecting = false;
       document.body.classList.remove('range-selecting');
       disableSwipe = false;
       if (e && e.cancelable) e.preventDefault();
 
-      const picked = getDateStringsBetween(selectionStartDate, selectionEndDate);
-      if (picked.length >= DRAG_MIN_DATES) {
-        openBulkEditModalForRange();
+      const dsList = getDsListBetweenIndices(startIdx, endIdx, cells);
+
+      if (dsList.length >= DRAG_MIN_DATES) {
+        openBulkEditModalForDs(dsList);
       } else {
+        // короткое выделение — считаем одиночным тапом по дню старта
         if (!moved && tapTargetDateStr) {
           editDayManually(parseYMDLocal(tapTargetDateStr));
         } else {
@@ -961,6 +958,7 @@ function addDayTouchHandlers(el) {
         }
       }
     } else {
+      // обычный тап/двойной тап
       const dt = Date.now() - touchStartTime;
       if (!moved && dt < 300 && tapTargetDateStr && !swipeConsumed) {
         if (editGestureMode === 'single') {
@@ -984,9 +982,10 @@ function addDayTouchHandlers(el) {
       }
     }
 
+    // сброс локальных переменных
     tapTargetDateStr = null;
-    // сброс метрик
-    daysList = null; colCenters = null; rowCenters = null; startRowIdx = null;
+    cells = null; colCenters = null; rowCenters = null;
+    startIdx = null; endIdx = null;
   };
 
   el.addEventListener('touchend', finish, { passive: false });
@@ -998,10 +997,13 @@ function addDayTouchHandlers(el) {
       clearSelectionHighlight();
     }
     disableSwipe = false;
+    // сброс
     tapTargetDateStr = null;
-    daysList = null; colCenters = null; rowCenters = null; startRowIdx = null;
+    cells = null; colCenters = null; rowCenters = null;
+    startIdx = null; endIdx = null;
   });
 }
+
 
 // Свайпы (месяц/год) — при рисовании диапазона отключены
 function setupSwipeNavigation() {
@@ -1253,6 +1255,142 @@ function getDateStringsBetween(a, b) {
     out.push(fmtYMDLocal(d)); // ЛОКАЛЬНЫЙ ключ
   }
   return out;
+}
+// Подсветка по индексам (вместо дат) — используется ТОЛЬКО в тач-режиме
+function updateSelectionHighlightIndices(aIdx, bIdx, cells) {
+  clearSelectionHighlight();
+  if (!cells || !cells.length) return;
+  const a = Math.min(aIdx, bIdx);
+  const b = Math.max(aIdx, bIdx);
+  for (let i = a; i <= b; i++) {
+    const el = cells[i];
+    if (el) {
+      el.classList.add('range-selected');
+      selectionEls.add(el);
+    }
+  }
+}
+
+// Список data-date по индексам
+function getDsListBetweenIndices(aIdx, bIdx, cells) {
+  const out = [];
+  if (!cells || !cells.length) return out;
+  const a = Math.min(aIdx, bIdx);
+  const b = Math.max(aIdx, bIdx);
+  for (let i = a; i <= b; i++) {
+    const ds = cells[i] && cells[i].getAttribute ? cells[i].getAttribute('data-date') : null;
+    if (ds) out.push(ds);
+  }
+  return out;
+}
+
+// Диалог массового редактирования для списка дат (без вычисления по календарным датам)
+function openBulkEditModalForDs(dsList) {
+  if (!dsList || !dsList.length) return;
+
+  const firstDate = parseYMDLocal(dsList[0]);
+  const lastDate  = parseYMDLocal(dsList[dsList.length - 1]);
+  const count = dsList.length;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 1000;
+  `;
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 10px; width: 92%; max-width: 360px;">
+      <h3 style="margin-bottom: 10px; text-align: center;">Массовое редактирование дат</h3>
+      <div style="font-size: 13px; color: #7f8c8d; text-align: center; margin-bottom: 12px;">
+        Даты: ${firstDate.toLocaleDateString('ru-RU')} — ${lastDate.toLocaleDateString('ru-RU')}<br>
+        Всего: ${count} ${pluralDays(count)}
+      </div>
+
+      <label style="display:block; margin: 8px 0 6px;">Выберите статус</label>
+      <select id="bulk-status" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px;">
+        <option value="auto">Автоматически (по графику)</option>
+        <option value="rest">Отдых</option>
+        <option value="plane-from-home">✈️ Самолет</option>
+        <option value="train">🚂 Поезд</option>
+        <option value="travel-to">Заезд + день</option>
+        <option value="work-day">День</option>
+        <option value="work-night">Ночь</option>
+        <option value="travel-from">Ночь + выезд</option>
+        <option value="travel-from-day">День + выезд</option>
+        <option value="sick">🟨 Больничный</option>
+        <option value="business-trip">🧳 Командировка</option>
+        <option value="vacation">🏖️ Отпуск</option>
+      </select>
+
+      <div id="bulk-note-wrap" style="display:none; margin-bottom: 10px;">
+        <label for="bulk-note" style="display:block; margin-bottom:6px;">Заметка для всех дней (командировка):</label>
+        <input id="bulk-note" type="text"
+               placeholder="например: мед.осмотр, обучение ОТ, тренинг"
+               style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;" />
+        <div style="margin-top:6px; font-size:11px; color:#7f8c8d;">
+          Одна и та же заметка будет показана вместо слова «Командировка» во всех выбранных датах.
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button id="bulk-apply" style="flex: 1; padding: 10px; background: #27ae60; color:#fff; border:none; border-radius:6px;">Применить</button>
+        <button id="bulk-cancel" style="flex: 1; padding: 10px; background: #e74c3c; color:#fff; border:none; border-radius:6px;">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const selectEl = modal.querySelector('#bulk-status');
+  const noteWrap = modal.querySelector('#bulk-note-wrap');
+  const noteInput = modal.querySelector('#bulk-note');
+
+  try {
+    const saved = localStorage.getItem('lastBulkStatus') || 'auto';
+    selectEl.value = saved;
+  } catch {}
+
+  const sync = () => { noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none'; };
+  sync();
+  selectEl.addEventListener('change', sync);
+
+  const closeModal = () => document.body.removeChild(modal);
+
+  modal.querySelector('#bulk-apply').addEventListener('click', () => {
+    const val = selectEl.value;
+    try { localStorage.setItem('lastBulkStatus', val); } catch {}
+    const noteText = (noteInput && noteInput.value || '').trim();
+
+    dsList.forEach(ds => {
+      if (val === 'auto') {
+        delete manualOverrides[ds];
+        delete manualNotes[ds];
+      } else {
+        manualOverrides[ds] = val;
+        if (val === 'business-trip') {
+          if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
+        } else {
+          delete manualNotes[ds];
+        }
+      }
+    });
+
+    saveData();
+    clearSelectionHighlight();
+    renderCalendar();
+    closeModal();
+    queueTgSync('bulk');
+  });
+
+  modal.querySelector('#bulk-cancel').addEventListener('click', () => {
+    clearSelectionHighlight();
+    closeModal();
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      clearSelectionHighlight();
+      closeModal();
+    }
+  });
 }
 
 // Поиск ячейки под пальцем: с приоритетом той же строки (недели)
@@ -2128,6 +2266,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
