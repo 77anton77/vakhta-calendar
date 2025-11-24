@@ -403,7 +403,7 @@ function initCalendar() {
   setupMouseRangeSelection();
   setupSwipeNavigation();
   updateLegendVisibility();
-  updateScheduleButtonText();
+  if (typeof updateScheduleButtonText === 'function') updateScheduleButtonText();
   addTgTestButton(); // тест‑кнопка в TG WebApp
   processPrintParams();
 }
@@ -1800,4 +1800,5 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
