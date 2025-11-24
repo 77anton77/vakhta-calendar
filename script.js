@@ -1465,127 +1465,202 @@ function pluralDays(n) {
 function showHelp() {
   const modal = document.createElement('div');
   modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
+    position:fixed; inset:0; background:rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center; z-index:1000;
   `;
+
+  const curMode = (typeof getCurrentScheduleName === 'function') ? getCurrentScheduleName() : '';
+
   modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 92%; max-width: 560px; max-height: 85vh; overflow-y: auto;">
-      <h3 style="margin:0 0 14px; text-align: center;">📋 Справка по календарю вахтовика</h3>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>🎯 Основная логика графика</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">График 28/28: 28 дней вахта → 28 дней отдых</p>
-        <p style="margin:6px 0;">Логистика = отдых: Самолет и поезд считаются днями отдыха</p>
-        <p style="margin:6px 0;">Рабочие дни: Заезд, дневные/ночные смены, выезд</p>
+    <div class="help-modal" style="
+      background:#fff; width:92%; max-width:560px; border-radius:12px;
+      display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.2);
+    ">
+      <div class="help-header" style="padding:16px 16px 8px;">
+        <h3 style="margin:0; font-size:18px; display:flex; align-items:center; gap:8px;">
+          <span>📋</span>
+          <span>Справка по календарю вахтовика</span>
+        </h3>
       </div>
 
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>🎛️ Режимы работы</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Стандартный (дневные/ночные смены) — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-        <p style="margin:6px 0;">Сахалинский (дневные/ночные смены) — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
-        <p style="margin:6px 0;">Стандартный дневной — с самолетами; 28 дневных; выезд: день + выезд</p>
-        <p style="margin:6px 0;">Сахалинский дневной — без самолетов; 28 дневных; выезд: день + выезд</p>
+      <div id="help-scroll" style="padding:0 16px 8px; overflow:auto; max-height:70vh;">
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">🧭</span>
+          <span class="help-txt">Основная логика графика</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p><b>График 28/28:</b> 28 дней вахта → 28 дней отдых</p>
+          <p><b>Логистика = отдых:</b> Самолет и поезд считаются днями отдыха</p>
+          <p><b>Рабочие дни:</b> Заезд, дневные/ночные смены, выезд</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">🎛️</span>
+          <span class="help-txt">Режимы работы</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          ${curMode ? `<div style="margin:6px 0 10px;">
+            <span style="display:inline-block; background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; border-radius:6px; padding:4px 8px; font-size:12px;">
+              Текущий режим: <b>${curMode}</b>
+            </span>
+          </div>` : ''}
+          <p>Стандартный (дневные/ночные смены) — с самолетами; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+          <p>Сахалинский (дневные/ночные смены) — без самолетов; 14 дневных + 14 ночных; выезд: ночь + выезд</p>
+          <p>Стандартный дневной — с самолетами; 28 дневных; выезд: день + выезд</p>
+          <p>Сахалинский дневной — без самолетов; 28 дневных; выезд: день + выезд</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">✏️</span>
+          <span class="help-txt">Редактирование дней</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p><b>Одиночное редактирование</b></p>
+          <ul class="help-ul">
+            <li>ПК: двойной клик по дню — открыть редактор статуса.</li>
+            <li>Смартфон: по умолчанию — двойной тап. Можно переключить на один тап: «Режимы вахты» → «Настройки» → «Ручное редактирование даты».</li>
+          </ul>
+          <p style="margin-top:8px;">В редакторе можно назначить: 🟨 Больничный, 🧳 Командировка, 🏖️ Отпуск и т.п. Ручные изменения подсвечиваются оранжевой рамкой и сохраняются автоматически.</p>
+
+          <p style="margin:12px 0 6px;"><b>Массовое редактирование дат</b></p>
+          <ul class="help-ul">
+            <li>ПК: Shift + протяжка мышью — выделится диапазон, далее выберите статус.</li>
+            <li>Смартфон: долго удерживайте (~0.45 с), затем проведите пальцем по датам и отпустите — появится окно массового редактирования.</li>
+            <li>Свайпы листают месяц/год и имеют приоритет.</li>
+          </ul>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">🗂️</span>
+          <span class="help-txt">Виды отображения</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p><b>Годовой вид:</b> 12 мини‑месяцев на одном экране. Тап по месяцу — переход к месяцу.</p>
+          <p><b>Месячный вид:</b> подробные статусы каждого дня, двойной клик — редактор.</p>
+          <p><b>Переключение:</b> кнопка «📊 Годовой вид» / «📅 Месячный вид».</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">📊</span>
+          <span class="help-txt">Статистика</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p>Показывает число отпусков/командировок/больничных за год и делит их на <em>в рабочие</em> / <em>в дни отдыха</em>.</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">🔄</span>
+          <span class="help-txt">Сброс изменений</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p>Удаляет ВСЕ ручные изменения. Основной график вахты сохраняется.</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">🔗</span>
+          <span class="help-txt">Поделиться / Экспорт · Импорт</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p>Кнопка «Поделиться» позволяет:</p>
+          <ul class="help-ul">
+            <li>Экспортировать базовый график (дата начала + режим) — короткий код для пересылки;</li>
+            <li>Экспортировать полный снимок (включая ручные правки) — длинный код;</li>
+            <li>Импортировать код (заменить всё или применить только базовый график);</li>
+            <li>Напечатать текущий месяц или весь год (можно «Сохранить как PDF»).</li>
+          </ul>
+          <p>При печати сохраняется выбранный период: «Печать: текущий месяц» печатает месяц из шапки календаря, «Печать: год» — текущий год. Чтобы распечатать другой период, сначала переключите месяц/год в шапке, затем снова выполните печать.</p>
+        </div>
+
+        
+        <h4 class="help-ttl">
+          <span class="help-ico">💾</span>
+          <span class="help-txt">Сохранение данных</span>
+          <span class="help-chev">▸</span>
+        </h4>
+        <div class="help-body">
+          <p>Все настройки сохраняются в браузере. При повторном открытии всё восстановится.</p>
+        </div>
       </div>
 
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>✏️ Редактирование дней</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">ПК: двойной клик по дню — открыть редактор статуса.</p>
-        <p style="margin:6px 0;">Смартфон: по умолчанию — двойной тап. Можно переключить на один тап: «Режимы вахты» → «Настройки» → «Ручное редактирование даты».</p>
-        <p style="margin:6px 0;">В редакторе можно назначить: 🟨 Больничный, 🧳 Командировка, 🏖️ Отпуск и т.п. Ручные изменения подсвечиваются оранжевой рамкой и сохраняются автоматически.</p>
-        <p style="margin:10px 0 6px; font-weight:600;">Массовое редактирование дат</p>
-        <ul style="margin:6px 0 0 18px; padding:0;">
-          <li style="margin:4px 0;">ПК: Shift + протяжка мышью — выделится диапазон, далее выберите статус.</li>
-          <li style="margin:4px 0;">Смартфон: долго удерживайте (~0.45 с), затем проведите пальцем по датам и отпустите — появится окно массового редактирования.</li>
-          <li style="margin:4px 0;">Свайпы листают месяц/год и имеют приоритет.</li>
-        </ul>
-      </div>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>🗂️ Виды отображения</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Годовой вид: 12 мини‑месяцев на одном экране. Тап по месяцу — переход к месяцу.</p>
-        <p style="margin:6px 0;">Месячный вид: подробные статусы каждого дня, двойной клик — редактор.</p>
-        <p style="margin:6px 0;">Переключение: кнопка «📊 Годовой вид» / «📅 Месячный вид».</p>
-      </div>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>📊 Статистика</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Показывает число отпусков/командировок/больничных за год и делит их на <em>в рабочие</em> / <em>в дни отдыха</em>.</p>
-      </div>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>🔄 Сброс изменений</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Удаляет ВСЕ ручные изменения. Основной график вахты сохраняется.</p>
-      </div>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>🔗 Поделиться / Экспорт · Импорт</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Кнопка «Поделиться» позволяет:</p>
-        <ul style="margin:6px 0 0 18px; padding:0;">
-          <li style="margin:4px 0;">Экспортировать базовый график (дата начала + режим) — короткий код для пересылки;</li>
-          <li style="margin:4px 0;">Экспортировать полный снимок (включая ручные правки) — длинный код;</li>
-          <li style="margin:4px 0;">Импортировать код (заменить всё или применить только базовый график);</li>
-          <li style="margin:4px 0;">Напечатать текущий месяц или весь год (можно «Сохранить как PDF»).</li>
-        </ul>
-        <p style="margin:6px 0;">При печати сохраняется выбранный период: «Печать: текущий месяц» печатает месяц из шапки календаря, «Печать: год» — текущий год. Чтобы распечатать другой период, сначала переключите месяц/год в шапке, затем снова выполните печать.</p>
-      </div>
-
-      <h4 style="margin:14px 0; font-size:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-        <span>💾 Сохранение данных</span><span class="chev" style="font-size:12px; opacity:.7; transition:transform .2s ease;">▼</span>
-      </h4>
-      <div>
-        <p style="margin:6px 0;">Все настройки сохраняются в браузере. При повторном открытии всё восстановится.</p>
-      </div>
-
-      <div style="margin-top: 14px;">
-        <button id="close-help" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 6px;">Закрыть</button>
+      <div class="help-footer" style="
+        position:sticky; bottom:0; background:#fff; padding:10px 16px 16px; border-top:1px solid #eee;
+      ">
+        <button id="close-help" style="
+          width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:8px;
+          font-weight:600; cursor:pointer;
+        ">Закрыть</button>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
 
-  // Аккордеон: первая секция открыта, остальные — закрыты
-  (function makeCollapsibleHelp() {
-    const container = modal.firstElementChild;
-    const headers = container.querySelectorAll('h4');
-    headers.forEach((h4, idx) => {
-      const chevron = h4.querySelector('.chev');
-      // Собираем все узлы до следующего h4
-      const contentNodes = [];
-      let el = h4.nextElementSibling;
-      while (el && el.tagName !== 'H4' && el.id !== 'close-help') {
-        contentNodes.push(el);
-        el = el.nextElementSibling;
-      }
-      const setCollapsed = (collapsed) => {
-        contentNodes.forEach(node => node.style.display = collapsed ? 'none' : '');
-        if (chevron) chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
-      };
-      // первая секция — открыта, остальные — закрыты
-      setCollapsed(idx !== 0);
-      h4.addEventListener('click', () => {
-        const collapsedNow = contentNodes.length ? contentNodes[0].style.display === 'none' : false;
-        setCollapsed(!collapsedNow);
-      });
-    });
-  })();
+  // Локальные стили (без влияния на страницу)
+  const style = document.createElement('style');
+  style.textContent = `
+    .help-ttl {
+      margin:10px 0; padding:8px 6px; border-radius:8px; background:#f7f9fc;
+      display:flex; align-items:center; gap:8px; cursor:pointer;
+      border:1px solid #e6eef8;
+    }
+    .help-ico { width:22px; text-align:center; }
+    .help-txt {
+      color:#2d7ef7; font-weight:600; flex:1; user-select:none;
+    }
+    .help-chev { color:#2d7ef7; transition:transform .2s ease; }
+    .help-body { padding:8px 6px 10px 30px; }
+    .help-body p { margin:6px 0; }
+    .help-ul { margin:6px 0 0 18px; padding:0; }
+    .help-ul li { margin:4px 0; }
+    /* Активная (раскрытая) секция */
+    .help-ttl.open { background:#eef5ff; border-color:#cfe3ff; }
+    .help-ttl.open .help-chev { transform:rotate(90deg); }
+  `;
+  modal.querySelector('.help-modal').appendChild(style);
 
-  modal.querySelector('#close-help').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
+  // Аккордеон: каждая h4 управляет своим ближайшим .help-body
+  const headers = Array.from(modal.querySelectorAll('.help-ttl'));
+  const bodies  = Array.from(modal.querySelectorAll('.help-body'));
+
+  const setCollapsed = (idx, collapsed) => {
+    const h = headers[idx], b = bodies[idx];
+    if (!h || !b) return;
+    b.style.display = collapsed ? 'none' : '';
+    if (collapsed) h.classList.remove('open'); else h.classList.add('open');
+  };
+  // Первая секция открыта, остальные закрыты
+  headers.forEach((h, idx) => setCollapsed(idx, idx !== 0));
+
+  headers.forEach((h, idx) => {
+    h.addEventListener('click', () => {
+      const b = bodies[idx];
+      const collapsedNow = b.style.display === 'none';
+      setCollapsed(idx, !collapsedNow);
+    });
+  });
+
+  // Закрыть
+  modal.querySelector('#close-help').addEventListener('click', () => {
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+  });
+  modal.addEventListener('click', (e) => { if (e.target === modal) {
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+  }});
 }
+
 
 
 // ========================
@@ -2161,6 +2236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
