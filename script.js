@@ -37,9 +37,6 @@ let longPressTimer = null;
 // Массовое редактирование (мышь: Shift + drag)
 let mouseSelecting = false;
 
-// Запоминать последний выбранный статус для диапазона
-let lastBulkStatus = localStorage.getItem('lastBulkStatus') || 'auto';
-
 // ========================
 // Переключение вида
 // ========================
@@ -63,7 +60,7 @@ function updateViewButton() {
 }
 
 // ========================
-// Годовой вид (CSS‑сетка, без JS‑масштабирования)
+// Годовой вид
 // ========================
 function renderYearView() {
   const calendarEl = document.getElementById('calendar');
@@ -84,10 +81,8 @@ function renderYearView() {
       yearContainer.appendChild(mini);
     }
   }
-
   calendarEl.appendChild(yearContainer);
 }
-
 
 // ========================
 // Месячный вид: подгоняем высоту ячеек
@@ -233,7 +228,7 @@ function getMonthStats(month) {
 }
 
 // ========================
-// Вспомогательное (локальные ключи дат — без UTC-сдвигов)
+// Вспомогательное
 // ========================
 function fmtYMDLocal(d) {
   const y = d.getFullYear();
@@ -323,6 +318,7 @@ function saveData() {
     currentView
   }));
 }
+
 function updateScheduleButtonText() {
   const btn = document.getElementById('schedule-select-btn');
   if (!btn) return;
@@ -353,26 +349,22 @@ function initCalendar() {
   setupSwipeNavigation();
   updateLegendVisibility();
   updateScheduleButtonText();
-  ensureActionsBar();   // ← добавь
-  addTgTestButton();    // ← уже было
+  ensureActionsBar();   // гарантируем панель для тест-кнопок
+  addTgTestButton();    // рисуем тест-кнопки TG
   processPrintParams();
+  showDebugBanner();    // маленький бейдж диагностики
 }
-
 
 function initTelegramApp() {
   if (window.Telegram && Telegram.WebApp) {
     try {
-      Telegram.WebApp.ready(); // важно
+      Telegram.WebApp.ready();
       Telegram.WebApp.expand();
       Telegram.WebApp.setHeaderColor('#2c3e50');
       Telegram.WebApp.setBackgroundColor('#1e3c72');
       Telegram.WebApp.BackButton.show();
       Telegram.WebApp.BackButton.onClick(() => Telegram.WebApp.close());
-      // Диагностика
-      console.log('[TG] WebApp OK:', {
-        platform: Telegram.WebApp.platform,
-        version: Telegram.WebApp.version
-      });
+      console.log('[TG] WebApp OK:', { platform: Telegram.WebApp.platform, version: Telegram.WebApp.version });
     } catch (e) {
       console.warn('[TG] initTelegramApp error:', e);
     }
@@ -381,8 +373,8 @@ function initTelegramApp() {
   }
 }
 
-
 function setupEventListeners() {
+  // Блокируем системное меню "копировать"
   document.addEventListener('contextmenu', (e) => {
     if (e.target.closest && e.target.closest('.calendar')) e.preventDefault();
   });
@@ -418,6 +410,7 @@ function setupEventListeners() {
   document.getElementById('current-month').addEventListener('click', showMonthYearPicker);
   document.getElementById('toggle-view').addEventListener('click', toggleView);
 
+  // ПК: клик по пустому месту снимает подсветку диапазона
   document.addEventListener('mousedown', (e) => {
     if (selectionEls && selectionEls.size) {
       const cell = e.target.closest && e.target.closest('.day');
@@ -972,7 +965,6 @@ function addDayTouchHandlers(el) {
   });
 }
 
-
 // Свайпы (месяц/год) — при рисовании диапазона отключены
 function setupSwipeNavigation() {
   const cal = document.getElementById('calendar');
@@ -1404,69 +1396,6 @@ function calculateAutoStatus(date) {
 }
 function isWorkDay(st) { return ['travel-to','work-day','work-night','travel-from','travel-from-day'].includes(st); }
 
-function showStatistics() {
-  const currentYear = currentDate.getFullYear();
-  let stats = {
-    sick: { total: 0, work: 0, rest: 0 },
-    businessTrip: { total: 0, work: 0, rest: 0 },
-    vacation: { total: 0, work: 0, rest: 0 }
-  };
-
-  Object.keys(manualOverrides).forEach(dateStr => {
-    const date = parseYMDLocal(dateStr);
-    if (date.getFullYear() === currentYear) {
-      const status = manualOverrides[dateStr];
-      const autoStatus = calculateAutoStatus(date);
-      if (status === 'sick') {
-        stats.sick.total++; if (isWorkDay(autoStatus)) stats.sick.work++; else stats.sick.rest++;
-      } else if (status === 'business-trip') {
-        stats.businessTrip.total++; if (isWorkDay(autoStatus)) stats.businessTrip.work++; else stats.businessTrip.rest++;
-      } else if (status === 'vacation') {
-        stats.vacation.total++; if (isWorkDay(autoStatus)) stats.vacation.work++; else stats.vacation.rest++;
-      }
-    }
-  });
-
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
-  `;
-  modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px;">
-      <h3 style="margin-bottom: 15px; text-align: center;">Статистика за ${currentYear} год</h3>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #f1c40f;">🟨 Больничные:</h4>
-        <div style="padding: 10px; background: #fffbf0; border-radius: 5px;">
-          Всего: ${stats.sick.total} ${pluralDays(stats.sick.total)}<br>
-          В рабочие дни: ${stats.sick.work} ${pluralDays(stats.sick.work)}<br>
-          В дни отдыха: ${stats.sick.rest} ${pluralDays(stats.sick.rest)}
-        </div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #1abc9c;">🧳 Командировки:</h4>
-        <div style="padding: 10px; background: #f0f9f7; border-radius: 5px;">
-          Всего: ${stats.businessTrip.total} ${pluralDays(stats.businessTrip.total)}<br>
-          В рабочие дни: ${stats.businessTrip.work} ${pluralDays(stats.businessTrip.work)}<br>
-          В дни отдыха: ${stats.businessTrip.rest} ${pluralDays(stats.businessTrip.rest)}
-        </div>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <h4 style="margin-bottom: 10px; color: #95a5a6;">🏖️ Отпуск:</h4>
-        <div style="padding: 10px; background: #f8f9fa; border-radius: 5px;">
-          Всего: ${stats.vacation.total} ${pluralDays(stats.vacation.total)}<br>
-          В рабочие дни: ${stats.vacation.work} ${pluralDays(stats.vacation.work)}<br>
-          В дни отдыха: ${stats.vacation.rest} ${pluralDays(stats.vacation.rest)}
-        </div>
-      </div>
-      <button id="close-stats" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;">Закрыть</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  modal.querySelector('#close-stats').addEventListener('click', () => document.body.removeChild(modal));
-  modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-}
-
 function pluralDays(n) {
   const mod10 = n % 10, mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return 'день';
@@ -1475,7 +1404,7 @@ function pluralDays(n) {
 }
 
 // ========================
-// Справка
+// Справка (аккордеон)
 // ========================
 function showHelp() {
   const modal = document.createElement('div');
@@ -1669,9 +1598,6 @@ function showHelp() {
     if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
   }});
 }
-
-
-
 
 // ========================
 // Выбор месяца/года
@@ -2028,6 +1954,7 @@ function copyText(text) {
   });
 }
 
+// Модалка «Поделиться» — стабильная версия без transform (центрирование по left/top)
 function openShareModal() {
   // 1) Оверлей
   const overlay = document.createElement('div');
@@ -2037,7 +1964,7 @@ function openShareModal() {
     z-index: 1000;
   `;
 
-  // 2) Контент модалки — БЕЗ transform, только фиксированные координаты
+  // 2) Контент модалки
   const content = document.createElement('div');
   content.id = 'share-content';
   content.style.cssText = `
@@ -2049,9 +1976,7 @@ function openShareModal() {
     padding: 16px;
     border-radius: 10px;
     z-index: 1001;
-    /* никаких blur/transform */
     filter: none; backdrop-filter: none; -webkit-backdrop-filter: none;
-    /* делаем текст максимально чётким локально */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   `;
@@ -2124,10 +2049,9 @@ function openShareModal() {
   document.body.appendChild(overlay);
   document.body.appendChild(content);
 
-  // 3) Центрируем по пикселям — без transform (чтобы не было субпиксельного размытия на пресетах)
+  // Центрируем по пикселям без transform
   const place = () => {
-    // сначала пусть блок “разложится”, потом снимем размеры
-    const w = Math.round(content.offsetWidth);   // целые px
+    const w = Math.round(content.offsetWidth);
     const h = Math.round(content.offsetHeight);
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -2139,7 +2063,6 @@ function openShareModal() {
   requestAnimationFrame(place);
   window.addEventListener('resize', place);
 
-  // 4) Закрытие
   const safeClose = () => {
     try {
       window.removeEventListener('resize', place);
@@ -2150,7 +2073,7 @@ function openShareModal() {
   overlay.addEventListener('click', safeClose);
   content.querySelector('#close-share').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); safeClose(); });
 
-  // 5) Копирование
+  // Копирование
   const basicCopied = content.querySelector('#basic-copied');
   content.querySelector('#copy-basic').addEventListener('click', () => {
     const ta = content.querySelector('#export-basic');
@@ -2166,7 +2089,7 @@ function openShareModal() {
     });
   });
 
-  // 6) Импорт
+  // Импорт
   content.querySelector('#apply-import').addEventListener('click', () => {
     const code = content.querySelector('#import-code').value.trim();
     if (!code) { alert('Вставьте код для импорта'); return; }
@@ -2196,7 +2119,7 @@ function openShareModal() {
     queueTgSync('import');
   });
 
-  // 7) Печать
+  // Печать
   content.querySelector('#print-month').addEventListener('click', () => { safeClose(); tryPrint('month'); });
   content.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
 }
@@ -2217,48 +2140,12 @@ function sendTgSnapshot(reason) {
   try {
     const payload = buildExportPayload(true);
     const envelope = { kind: 'snapshot', data: payload, reason: reason || '' };
+    console.log('[TG] sendData:', envelope);
     if (isTGWebApp()) Telegram.WebApp.sendData(JSON.stringify(envelope));
-  } catch {}
-}
-function addTgTestButton() {
-  const actions = ensureActionsBar();
-  if (!actions || actions.querySelector('#tg-test-sync')) return;
-
-  const inTG = !!(window.Telegram && Telegram.WebApp);
-  const force = /(?:\\?|&)tgtest=1\\b/.test(location.search); // форс-показ в браузере
-  if (!inTG && !force) return; // по умолчанию видна только в TG WebApp
-
-  // Укажи username твоего бота (без @) — для deep-link из браузера
-  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← замени на своего
-
-  const btn = document.createElement('button');
-  btn.id = 'tg-test-sync';
-  btn.style.cssText = 'padding:8px 10px; background:#6c757d; color:#fff; border:none; border-radius:6px; cursor:pointer;';
-  btn.title = inTG ? 'Проверка связи с ботом (WebApp)' : 'Эмуляция из браузера (deep-link)';
-  btn.textContent = inTG ? 'Тест синхронизации (TG)' : 'Тест синхронизации (эмуляция)';
-
-  btn.addEventListener('click', () => {
-    try {
-      const payload = buildExportPayload(true);
-      const envelope = { kind: 'snapshot', data: payload, reason: 'manual-test' };
-
-      if (inTG) {
-        Telegram.WebApp.sendData(JSON.stringify(envelope));
-        alert('Отправлено в бота через WebApp.sendData. Проверьте чат бота.');
-      } else {
-        // fallback: deep-link в /start с кодом
-        const code = buildExportCode(true);
-        const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
-        window.open(url, '_blank');
-      }
-    } catch (e) {
-      alert('Ошибка теста: ' + (e && e.message ? e.message : e));
-    }
-  });
-
-  actions.prepend(btn);
+  } catch (e) { console.warn('[TG] sendData error', e); }
 }
 
+// Панель действий (гарантия наличия)
 function ensureActionsBar() {
   let actions = document.querySelector('.actions');
   if (!actions) {
@@ -2276,6 +2163,69 @@ function ensureActionsBar() {
   return actions;
 }
 
+// Тест-кнопки (рисуются всегда)
+function addTgTestButton() {
+  const actions = ensureActionsBar();
+  if (!actions) return;
+  const old = actions.querySelectorAll('.tg-test-btn');
+  old.forEach(b => b.remove());
+
+  // 1) Кнопка отправки через WebApp (только внутри Telegram WebApp)
+  const btnSend = document.createElement('button');
+  btnSend.className = 'tg-test-btn';
+  btnSend.textContent = 'TG: sendData (snapshot)';
+  btnSend.style.cssText = 'padding:8px 10px; background:#6c757d; color:#fff; border:none; border-radius:6px; cursor:pointer;';
+  btnSend.onclick = () => {
+    try {
+      const payload = buildExportPayload(true);
+      const envelope = { kind: 'snapshot', data: payload, reason: 'manual-test' };
+      if (window.Telegram && Telegram.WebApp) {
+        Telegram.WebApp.sendData(JSON.stringify(envelope));
+        alert('Отправлено через Telegram.WebApp.sendData. Проверьте чат бота и логи web_app_data.');
+      } else {
+        alert('Telegram.WebApp не обнаружен (страница открыта не как WebApp)');
+      }
+    } catch (e) {
+      alert('Ошибка sendData: ' + (e && e.message ? e.message : e));
+    }
+  };
+
+  // 2) Кнопка deep-link (fallback из браузера)
+  const BOT_USERNAME = 'YOUR_BOT_USERNAME'; // ← ЗАМЕНИТЕ на username вашего бота (без @)
+  const btnLink = document.createElement('button');
+  btnLink.className = 'tg-test-btn';
+  btnLink.textContent = 'Deep-link: t.me/... (SNAP-...)';
+  btnLink.style.cssText = 'padding:8px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer;';
+  btnLink.onclick = () => {
+    try {
+      if (!BOT_USERNAME || BOT_USERNAME === 'YOUR_BOT_USERNAME') {
+        alert('Укажите BOT_USERNAME в addTgTestButton');
+        return;
+      }
+      const code = buildExportCode(true);
+      const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
+      window.open(url, '_blank');
+    } catch (e) {
+      alert('Ошибка deep-link: ' + (e && e.message ? e.message : e));
+    }
+  };
+
+  actions.prepend(btnLink);
+  actions.prepend(btnSend);
+}
+
+// Маленький отладочный бейдж внизу
+function showDebugBanner() {
+  try {
+    const div = document.createElement('div');
+    const inTG = !!(window.Telegram && Telegram.WebApp);
+    const tgtest = /(?:\?|&)tgtest=1\b/.test(location.search);
+    div.textContent = `TG:${inTG ? 'YES' : 'NO'} | tgtest:${tgtest ? '1' : '0'} | path:${location.pathname}`;
+    div.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:2000;background:#000c;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 system-ui';
+    document.body.appendChild(div);
+  } catch {}
+}
+
 // ========================
 // Запуск
 // ========================
@@ -2286,11 +2236,3 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
-
-
-
-
-
-
-
-
