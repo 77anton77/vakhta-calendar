@@ -361,7 +361,8 @@ function loadSavedData() {
 
     if (data.currentView) currentView = data.currentView === 'year' ? 'year' : 'month';
   }
-  updateScheduleButtonText();
+  if (typeof updateScheduleButtonText === 'function') updateScheduleButtonText();
+
 }
 
 function saveData() {
@@ -372,6 +373,22 @@ function saveData() {
     currentSchedule,
     currentView
   }));
+}
+function updateScheduleButtonText() {
+  const btn = document.getElementById('schedule-select-btn');
+  if (!btn) return;
+  const texts = {
+    'standard': '📋 Стандартный',
+    'sakhalin': '🏝️ Сахалинский',
+    'standard-day': '☀️ Стандартный дневной',
+    'sakhalin-day': '☀️ Сахалинский дневной'
+  };
+  const currentText = texts[currentSchedule] || 'Режимы вахты';
+  btn.innerHTML = `
+    <div style="font-size: 10px; line-height: 1; margin-bottom: 2px; opacity: .8;">РЕЖИМ ВАХТЫ</div>
+    <div style="font-size: 12px; line-height: 1.1;">${currentText} ▼</div>
+  `;
+  btn.title = `Текущий режим: ${currentText}. Нажмите для изменения`;
 }
 
 // ========================
@@ -1783,3 +1800,4 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
