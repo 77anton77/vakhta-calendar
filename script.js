@@ -897,7 +897,9 @@ function addDayTouchHandlers(el) {
 
     if (selecting && e && e.changedTouches && e.changedTouches[0]) {
       const t = e.changedTouches[0];
-      const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, startRowIdx);
+      const prefRow = rowLockReleased ? null : startRowIdx;
+const dayEl = findDayCellAtClientPoint(t.clientX, t.clientY, prefRow);
+
       let ds = dayEl && dayEl.getAttribute('data-date');
       if (!ds && lastHoverDs) ds = lastHoverDs;
       if (ds) selectionEndDate = parseYMDLocal(ds);
@@ -2084,6 +2086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
