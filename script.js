@@ -1840,139 +1840,152 @@ function copyText(text) {
 }
 
 function openShareModal() {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0,0,0,.5);
-    display:flex; align-items:center; justify-content:center; z-index:1000;
-    filter:none; backdrop-filter:none; -webkit-backdrop-filter:none;
+  // 1) Оверлей
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1000;
+  `;
+
+  // 2) Контент модалки — БЕЗ transform, только фиксированные координаты
+  const content = document.createElement('div');
+  content.id = 'share-content';
+  content.style.cssText = `
+    position: fixed;
+    width: min(560px, calc(100vw - 16px));
+    max-height: 85vh;
+    overflow: auto;
+    background: #fff;
+    padding: 16px;
+    border-radius: 10px;
+    z-index: 1001;
+    /* никаких blur/transform */
+    filter: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+    /* делаем текст максимально чётким локально */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   `;
 
   const basicCode = buildExportCode(false);
   const fullCode  = buildExportCode(true);
 
-  modal.innerHTML = `
-    <div id="share-content"
-         style="
-           background:#fff; padding:16px; border-radius:10px; width:92%; max-width:560px;
-           max-height:85vh; overflow:auto;
-           filter:none; backdrop-filter:none; -webkit-backdrop-filter:none;
-         ">
-      <h3 class="share-h" style="text-align:center; margin-bottom:12px;">Поделиться / Экспорт · Импорт</h3>
+  content.innerHTML = `
+    <h3 style="text-align:center; margin-bottom:12px; margin-top:0;">Поделиться / Экспорт · Импорт</h3>
 
-      <div style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; flex-direction:column; gap:14px;">
 
-        <div class="share-block" style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div class="share-title">Экспорт (базовый график)</div>
-          <div class="share-desc">
-            Дата начала вахты + выбранный режим. Подходит, чтобы у получателя построился такой же график без ваших ручных правок.
-          </div>
-          <textarea id="export-basic" readonly class="share-ta">${basicCode}</textarea>
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="copy-basic" class="share-btn">Скопировать</button>
-            <span id="basic-copied" class="share-ok">Скопировано</span>
-          </div>
+      <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Экспорт (базовый график)</div>
+        <div style="font-size:12px; color:#7f8c8d; margin-bottom:8px;">
+          Дата начала вахты + выбранный режим. Подходит, чтобы у получателя построился такой же график без ваших ручных правок.
         </div>
-
-        <div class="share-block" style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div class="share-title">Экспорт (полный снимок)</div>
-          <div class="share-desc">
-            Базовый график + ваши ручные правки. Передавайте только доверенным людям.
-          </div>
-          <textarea id="export-full" readonly class="share-ta">${fullCode}</textarea>
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="copy-full" class="share-btn">Скопировать</button>
-            <span id="full-copied" class="share-ok">Скопировано</span>
-          </div>
+        <textarea id="export-basic" readonly style="width:100%; height:70px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;">${basicCode}</textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="copy-basic" style="padding:8px 10px; background:#27ae60; color:#fff; border:none; border-radius:6px;">Скопировать</button>
+          <span id="basic-copied" style="font-size:12px; color:#27ae60; display:none;">Скопировано</span>
         </div>
-
-        <div class="share-block" style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div class="share-title">Импорт</div>
-          <textarea id="import-code" placeholder="Вставьте код здесь" class="share-ta"></textarea>
-          <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
-            <label class="share-radio"><input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)</label>
-            <label class="share-radio"><input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)</label>
-            <button id="apply-import" class="share-btn" style="margin-left:auto; background:#3498db;">Импортировать</button>
-          </div>
-        </div>
-
-        <div class="share-block" style="border:1px solid #eee; border-radius:8px; padding:12px;">
-          <div class="share-title">Печать</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="print-month" class="share-btn" style="background:#2ecc71;">Печать: текущий месяц</button>
-            <button id="print-year"  class="share-btn" style="background:#2ecc71;">Печать: год</button>
-          </div>
-          <div class="share-desc" style="margin-top:6px;">
-            Печатается выбранный период: «Печать: текущий месяц» — месяц из шапки календаря, «Печать: год» — текущий год.
-          </div>
-        </div>
-
       </div>
 
-      <div style="display:flex; gap:10px; margin-top:14px;">
-        <button id="close-share" class="share-btn" style="flex:1; background:#e74c3c;">Закрыть</button>
+      <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Экспорт (полный снимок)</div>
+        <div style="font-size:12px; color:#7f8c8d; margin-bottom:8px;">
+          Базовый график + ваши ручные правки. Передавайте только доверенным людям. 
+        </div>
+        <textarea id="export-full" readonly style="width:100%; height:90px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;">${fullCode}</textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="copy-full" style="padding:8px 10px; background:#27ae60; color:#fff; border:none; border-radius:6px;">Скопировать</button>
+          <span id="full-copied" style="font-size:12px; color:#27ae60; display:none;">Скопировано</span>
+        </div>
       </div>
+
+      <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Импорт</div>
+        <textarea id="import-code" placeholder="Вставьте код здесь" style="width:100%; height:80px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+            <input type="radio" name="import-mode" value="all" checked> Заменить всё (режим, дата, ручные правки)
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+            <input type="radio" name="import-mode" value="basic"> Только базовый график (режим + дата)
+          </label>
+          <button id="apply-import" style="margin-left:auto; padding:8px 10px; background:#3498db; color:#fff; border:none; border-radius:6px;">Импортировать</button>
+        </div>
+      </div>
+
+      <div style="border:1px solid #eee; border-radius:8px; padding:12px;">
+        <div style="font-weight:600; margin-bottom:8px;">Печать</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="print-month" style="padding:8px 10px; background:#2ecc71; color:#fff; border:none; border-radius:6px;">Печать: текущий месяц</button>
+          <button id="print-year"  style="padding:8px 10px; background:#2ecc71; color:#fff; border:none; border-radius:6px;">Печать: год</button>
+        </div>
+        <div style="font-size:12px; color:#7f8c8d; margin-top:6px;">
+          Печатается выбранный период: «Печать: текущий месяц» — месяц из шапки календаря, «Печать: год» — текущий год.
+        </div>
+      </div>
+
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button id="close-share" style="padding:10px; width:100%; background:#e74c3c; color:#fff; border:none; border-radius:6px;">Закрыть</button>
     </div>
   `;
-  document.body.appendChild(modal);
 
-  // Локальный «анти-размытие» только для элементов окна
-  const crisp = (el) => {
-    if (!el) return;
-    el.style.webkitFontSmoothing = 'antialiased';     // WebKit
-    el.style.MozOsxFontSmoothing = 'grayscale';       // Firefox macOS
-    el.style.textRendering = 'optimizeLegibility';
-    el.style.filter = 'none';
-    el.style.backdropFilter = 'none';
-    el.style.webkitBackdropFilter = 'none';
+  // Добавляем в DOM
+  document.body.appendChild(overlay);
+  document.body.appendChild(content);
+
+  // 3) Центрируем по пикселям — без transform (чтобы не было субпиксельного размытия на пресетах)
+  const place = () => {
+    // сначала пусть блок “разложится”, потом снимем размеры
+    const w = Math.round(content.offsetWidth);   // целые px
+    const h = Math.round(content.offsetHeight);
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const left = Math.max(8, Math.round((vw - w) / 2));
+    const top  = Math.max(8, Math.round((vh - h) / 2));
+    content.style.left = left + 'px';
+    content.style.top  = top + 'px';
   };
-  crisp(modal);
-  const sc = modal.querySelector('#share-content');
-  crisp(sc);
-  sc.querySelectorAll('.share-h,.share-title,.share-desc,.share-ta,.share-btn,.share-radio').forEach(crisp);
+  requestAnimationFrame(place);
+  window.addEventListener('resize', place);
 
-  // Мини-стили для ввода/кнопок (без сторонних эффектов)
-  const css = `
-    #share-content .share-title{ font-weight:600; margin-bottom:8px; color:#2c3e50; }
-    #share-content .share-desc{ font-size:12px; color:#7f8c8d; }
-    #share-content .share-ta{ width:100%; min-height:70px; font-size:12px; padding:8px; border:1px solid #ddd; border-radius:6px; }
-    #share-content .share-btn{ padding:8px 10px; background:#27ae60; color:#fff; border:none; border-radius:6px; cursor:pointer; }
-    #share-content .share-ok{ font-size:12px; color:#27ae60; display:none; }
-    #share-content .share-radio{ display:flex; align-items:center; gap:6px; font-size:12px; color:#2c3e50; }
-  `;
-  const style = document.createElement('style');
-  style.textContent = css;
-  sc.appendChild(style);
+  // 4) Закрытие
+  const safeClose = () => {
+    try {
+      window.removeEventListener('resize', place);
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      if (content && content.parentNode) content.parentNode.removeChild(content);
+    } catch {}
+  };
+  overlay.addEventListener('click', safeClose);
+  content.querySelector('#close-share').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); safeClose(); });
 
-  // Закрытие
-  const safeClose = () => { try { if (modal && modal.parentNode) modal.parentNode.removeChild(modal); } catch {} };
-  modal.addEventListener('click', (e) => { if (e.target === modal) safeClose(); });
-  modal.querySelector('#close-share').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); safeClose(); });
-
-  // Копирование
-  const basicCopied = modal.querySelector('#basic-copied');
-  modal.querySelector('#copy-basic').addEventListener('click', () => {
-    const ta = modal.querySelector('#export-basic');
+  // 5) Копирование
+  const basicCopied = content.querySelector('#basic-copied');
+  content.querySelector('#copy-basic').addEventListener('click', () => {
+    const ta = content.querySelector('#export-basic');
     copyText(ta.value).then(() => {
       if (basicCopied) { basicCopied.style.display = 'inline'; setTimeout(() => basicCopied.style.display = 'none', 1500); }
     });
   });
-  const fullCopied = modal.querySelector('#full-copied');
-  modal.querySelector('#copy-full').addEventListener('click', () => {
-    const ta = modal.querySelector('#export-full');
+  const fullCopied = content.querySelector('#full-copied');
+  content.querySelector('#copy-full').addEventListener('click', () => {
+    const ta = content.querySelector('#export-full');
     copyText(ta.value).then(() => {
       if (fullCopied) { fullCopied.style.display = 'inline'; setTimeout(() => fullCopied.style.display = 'none', 1500); }
     });
   });
 
-  // Импорт
-  modal.querySelector('#apply-import').addEventListener('click', () => {
-    const code = modal.querySelector('#import-code').value.trim();
+  // 6) Импорт
+  content.querySelector('#apply-import').addEventListener('click', () => {
+    const code = content.querySelector('#import-code').value.trim();
     if (!code) { alert('Вставьте код для импорта'); return; }
     const obj = decodeImportCode(code);
     if (!obj || typeof obj !== 'object' || (obj.v !== 1 && obj.v !== undefined)) {
       alert('Неподдерживаемый формат кода'); return;
     }
-    const mode = modal.querySelector('input[name="import-mode"]:checked').value;
+    const mode = content.querySelector('input[name="import-mode"]:checked').value;
     const applyBasic = () => {
       if (obj.vakhtaStartDate) {
         const d = parseYMDLocal(obj.vakhtaStartDate);
@@ -1980,8 +1993,9 @@ function openShareModal() {
       }
       if (obj.currentSchedule) currentSchedule = obj.currentSchedule;
     };
-    if (mode === 'basic') applyBasic();
-    else {
+    if (mode === 'basic') {
+      applyBasic();
+    } else {
       applyBasic();
       manualOverrides = (obj.manualOverrides && typeof obj.manualOverrides === 'object') ? obj.manualOverrides : {};
       manualNotes     = (obj.manualNotes     && typeof obj.manualNotes     === 'object') ? obj.manualNotes     : {};
@@ -1993,13 +2007,10 @@ function openShareModal() {
     queueTgSync('import');
   });
 
-  // Печать
-  modal.querySelector('#print-month').addEventListener('click', () => { safeClose(); tryPrint('month'); });
-  modal.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
+  // 7) Печать
+  content.querySelector('#print-month').addEventListener('click', () => { safeClose(); tryPrint('month'); });
+  content.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
 }
-
-
-
 
 // ========================
 // Автосинхронизация (TG)
@@ -2046,6 +2057,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
