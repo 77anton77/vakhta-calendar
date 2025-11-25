@@ -2386,6 +2386,7 @@ function queryFlag(name, def = false) {
 
 // Тест-кнопки (рисуются всегда)
 // Одна умная кнопка синхронизации
+// Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 function addTgTestButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
@@ -2398,10 +2399,8 @@ function addTgTestButton() {
   const forceShow = queryFlag('sync', false);        // ?sync=1 — принудительно показать
   const forceHide = (new URLSearchParams(location.search).get('sync') === '0'); // ?sync=0 — скрыть
 
-  if ((!(inTG)) && !forceShow) return;               // вне Telegram — кнопку не показываем (если не принудительно)
-  if (forceHide) return;                             // принудительно скрыто
+  if ((!inTG && !forceShow) || forceHide) return;
 
-  // создаём кнопку
   const btn = document.createElement('button');
   btn.className = 'tg-test-btn';
   btn.textContent = '🔄 Синхронизировать с ботом';
@@ -2416,8 +2415,8 @@ function addTgTestButton() {
     actions.appendChild(btn);
   }
 
-  // username бота для deep-link (замените на свой, без @)
-  const BOT_USERNAME = 'YOUR_BOT_USERNAME';
+  // ОБЯЗАТЕЛЬНО: имя твоего бота (без @) для резерва
+  const BOT_USERNAME = 'VakhtaCalendarBot';
 
   let pending = false;
   const setPending = (v, label) => {
@@ -2430,44 +2429,48 @@ function addTgTestButton() {
   btn.addEventListener('click', () => {
     if (pending) return;
     const hasWA = !!(window.Telegram && Telegram.WebApp);
+    const forceDeep = queryFlag('forcedeep', false); // ?forcedeep=1 — принудительно дублировать через deep-link
 
     setPending(true, '⏳ Синхронизация…');
+    let sendOk = false;
+
     try {
       const payload = buildExportPayload(true);
       const envelope = { kind: 'snapshot', data: payload, reason: 'manual-sync' };
 
+      // Путь 1: WebApp.sendData (если доступен)
       if (hasWA) {
-        // нормальные клиенты Telegram WebApp
         try {
           Telegram.WebApp.sendData(JSON.stringify(envelope));
-          setPending(false, '✅ Синхронизировано');
-          showToast('Отправлено боту');
-          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1500);
+          sendOk = true;
         } catch (e) {
-          setPending(false, '⚠️ Ошибка, повторите');
-          showToast('Не удалось отправить', 2000);
-          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
+          console.warn('[TG] sendData error:', e);
         }
-      } else {
-        // fallback: deep-link SNAP-...
-        if (!BOT_USERNAME || BOT_USERNAME === 'YOUR_BOT_USERNAME') {
-          setPending(false, '⚠️ Укажите BOT_USERNAME');
-          showToast('Укажите BOT_USERNAME в коде', 2200);
-          setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
-          return;
-        }
+      }
+
+      // Путь 2: deep-link SNAP-… (если нет WebApp или включён forcedeep, или sendData не сработал)
+      if (!hasWA || forceDeep || !sendOk) {
         const code = buildExportCode(true);
         const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${code}`;
-        // пытаемся открыть; если браузер блокирует — пользователь увидит предупреждение
-        try { window.open(url, '_blank'); }
-        catch { window.location.href = url; }
-        setPending(false, '✅ Открываю бота…');
-        setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1500);
+        try {
+          if (hasWA && Telegram.WebApp.openLink) {
+            Telegram.WebApp.openLink(url);
+          } else {
+            window.open(url, '_blank');
+          }
+        } catch {
+          window.location.href = url;
+        }
       }
+
+      setPending(false, '✅ Отправлено');
+      showToast('Отправлено боту');
+      setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1200);
     } catch (e) {
+      console.warn('[TG] sync error:', e);
       setPending(false, '⚠️ Ошибка, повторите');
       showToast('Ошибка синхронизации', 2000);
-      setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1800);
+      setTimeout(() => { btn.textContent = '🔄 Синхронизировать с ботом'; }, 1500);
     }
   });
 }
@@ -2503,5 +2506,6 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
