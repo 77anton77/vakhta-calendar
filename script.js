@@ -790,19 +790,28 @@ function editDayManually(date) {
 // ========================
 // Массовое редактирование (тач) — прямоугольник по сетке
 // ========================
+// ========================
+// ========================
+// Массовое редактирование (тач) — линейно по индексам 0..41 с “умным якорем” и сбросом при развороте
+// ========================
 function addDayTouchHandlers(el) {
   let touchStartTime = 0;
   let startX = 0, startY = 0;
   let moved = false;
   let tapTargetDateStr = null;
 
-  let cells = null;
-  let colCenters = null;
-  let rowCenters = null;
-  let startIdx = null;
-  let endIdx = null;
-  let startRow = null, startCol = null;
-  let curRow = null, curCol = null;
+  // Снимок сетки
+  let cells = null;        // 42 .day
+  let colCenters = null;   // 7 центров X
+  let rowCenters = null;   // 6 центров Y
+  let startIdx = null;     // 0..41
+  let curIdx = null;       // 0..41 (текущий)
+  let anchorIdx = null;    // якорь диапазона
+  let minIdxVisited = null, maxIdxVisited = null;
+
+  // Для детекции разворота по вертикали
+  let lastRow = null;
+  let lastRowDir = 0; // -1 вверх, +1 вниз, 0 нет
 
   const nearestIndex = (arr, v) => {
     let best = 0, bestDist = Infinity;
@@ -820,15 +829,16 @@ function addDayTouchHandlers(el) {
 
     startIdx = list.indexOf(hitEl);
     if (startIdx < 0) startIdx = 0;
-    startRow = Math.floor(startIdx / 7);
-    startCol = startIdx % 7;
 
+    // центры строк
     rowCenters = [];
     for (let r = 0; r < 6; r++) {
       const cell = list[r * 7];
       const cr = cell.getBoundingClientRect();
       rowCenters.push((cr.top + cr.bottom) / 2);
     }
+    // центры колонок (по строке старта — колонки одинаковой ширины)
+    const startRow = Math.floor(startIdx / 7);
     colCenters = [];
     for (let c = 0; c < 7; c++) {
       const cell = list[startRow * 7 + c];
@@ -862,9 +872,18 @@ function addDayTouchHandlers(el) {
 
     if (!buildGrid(hit)) return;
 
-    endIdx = startIdx;
+    // инициализация
+    curIdx = startIdx;
+    anchorIdx = startIdx;
+    minIdxVisited = startIdx;
+    maxIdxVisited = startIdx;
+
+    lastRow = Math.floor(startIdx / 7);
+    lastRowDir = 0;
+
     selecting = false;
 
+    // для совместимости с ПК-диалогом (если выделение сорвётся раньше)
     selectionStartDate = parseYMDLocal(ds);
     selectionEndDate   = parseYMDLocal(ds);
 
@@ -874,7 +893,7 @@ function addDayTouchHandlers(el) {
       selecting = true;
       disableSwipe = true;
       document.body.classList.add('range-selecting');
-      updateSelectionHighlightRect(startRow, startCol, startRow, startCol, cells);
+      updateSelectionHighlightIndices(anchorIdx, curIdx, cells);
     }, LONG_PRESS_MS);
   }, { passive: true });
 
@@ -896,13 +915,45 @@ function addDayTouchHandlers(el) {
     }
 
     if (cells && colCenters && rowCenters) {
-      curCol = nearestIndex(colCenters, t.clientX);
-      curRow = nearestIndex(rowCenters, t.clientY);
-      const idx = curRow * 7 + curCol;
+      const col = Math.max(0, Math.min(6, nearestIndex(colCenters, t.clientX)));
+      const row = Math.max(0, Math.min(5, nearestIndex(rowCenters, t.clientY)));
+      const idx = row * 7 + col;
 
-      if (idx !== endIdx && idx >= 0 && idx < cells.length) {
-        endIdx = idx;
-        updateSelectionHighlightRect(startRow, startCol, curRow, curCol, cells);
+      if (idx !== curIdx && idx >= 0 && idx < cells.length) {
+        // детекция разворота по вертикали (изменился знак движения по рядам)
+        const rowDir = (lastRow === null || row === lastRow) ? lastRowDir
+                      : (row > lastRow ? 1 : -1);
+        const turned = (lastRowDir !== 0 && rowDir !== 0 && rowDir !== lastRowDir);
+
+        curIdx = idx;
+
+        // Если развернулись вверх/вниз — обнуляем "дальние" экстремумы до текущей позиции,
+        // чтобы диапазон начал сжиматься со стороны конца, как на ПК
+        if (turned) {
+          minIdxVisited = Math.min(startIdx, curIdx);
+          maxIdxVisited = Math.max(startIdx, curIdx);
+        } else {
+          // обычный режим — накапливаем экстремумы
+          minIdxVisited = Math.min(minIdxVisited, curIdx);
+          maxIdxVisited = Math.max(maxIdxVisited, curIdx);
+        }
+
+        // “умный якорь” (только для прохождения через старт слева/справа)
+        if (curIdx >= startIdx && minIdxVisited < startIdx) {
+          anchorIdx = minIdxVisited;   // ушли влево и сейчас справа — держим левый край
+        } else if (curIdx <= startIdx && maxIdxVisited > startIdx) {
+          anchorIdx = maxIdxVisited;   // ушли вправо и сейчас слева — держим правый край
+        } else {
+          anchorIdx = startIdx;        // иначе — якорь на старте
+        }
+
+        updateSelectionHighlightIndices(anchorIdx, curIdx, cells);
+
+        // обновляем "последний ряд/направление"
+        if (row !== lastRow) {
+          lastRowDir = rowDir;
+          lastRow = row;
+        }
       }
       if (e && e.cancelable) e.preventDefault();
     }
@@ -914,10 +965,29 @@ function addDayTouchHandlers(el) {
     if (selecting) {
       if (e && e.changedTouches && e.changedTouches[0] && cells && colCenters && rowCenters) {
         const t = e.changedTouches[0];
-        curCol = nearestIndex(colCenters, t.clientX);
-        curRow = nearestIndex(rowCenters, t.clientY);
-        const idx = curRow * 7 + curCol;
-        if (idx >= 0 && idx < cells.length) endIdx = idx;
+        const col = Math.max(0, Math.min(6, nearestIndex(colCenters, t.clientX)));
+        const row = Math.max(0, Math.min(5, nearestIndex(rowCenters, t.clientY)));
+        const idx = row * 7 + col;
+        if (idx >= 0 && idx < cells.length) {
+          // аналогично touchmove
+          const rowDir = (lastRow === null || row === lastRow) ? lastRowDir
+                        : (row > lastRow ? 1 : -1);
+          const turned = (lastRowDir !== 0 && rowDir !== 0 && rowDir !== lastRowDir);
+
+          curIdx = idx;
+
+          if (turned) {
+            minIdxVisited = Math.min(startIdx, curIdx);
+            maxIdxVisited = Math.max(startIdx, curIdx);
+          } else {
+            minIdxVisited = Math.min(minIdxVisited, curIdx);
+            maxIdxVisited = Math.max(maxIdxVisited, curIdx);
+          }
+
+          if (curIdx >= startIdx && minIdxVisited < startIdx) anchorIdx = minIdxVisited;
+          else if (curIdx <= startIdx && maxIdxVisited > startIdx) anchorIdx = maxIdxVisited;
+          else anchorIdx = startIdx;
+        }
       }
 
       selecting = false;
@@ -925,7 +995,7 @@ function addDayTouchHandlers(el) {
       disableSwipe = false;
       if (e && e.cancelable) e.preventDefault();
 
-      const dsList = getDsListForRect(startRow, startCol, curRow ?? startRow, curCol ?? startCol, cells);
+      const dsList = getDsListBetweenIndices(anchorIdx, curIdx, cells);
 
       if (dsList.length >= DRAG_MIN_DATES) {
         openBulkEditModalForDs(dsList);
@@ -960,11 +1030,12 @@ function addDayTouchHandlers(el) {
       }
     }
 
+    // сброс локального состояния
     tapTargetDateStr = null;
     cells = null; colCenters = null; rowCenters = null;
-    startIdx = null; endIdx = null;
-    startRow = null; startCol = null;
-    curRow = null; curCol = null;
+    startIdx = null; curIdx = null; anchorIdx = null;
+    minIdxVisited = null; maxIdxVisited = null;
+    lastRow = null; lastRowDir = 0;
   };
 
   el.addEventListener('touchend', finish, { passive: false });
@@ -979,11 +1050,16 @@ function addDayTouchHandlers(el) {
 
     tapTargetDateStr = null;
     cells = null; colCenters = null; rowCenters = null;
-    startIdx = null; endIdx = null;
-    startRow = null; startCol = null;
-    curRow = null; curCol = null;
+    startIdx = null; curIdx = null; anchorIdx = null;
+    minIdxVisited = null; maxIdxVisited = null;
+    lastRow = null; lastRowDir = 0;
   });
 }
+
+
+
+
+
 
 // Свайпы (месяц/год) — при рисовании диапазона отключены
 function setupSwipeNavigation() {
@@ -1122,6 +1198,38 @@ function getDateStringsBetween(a, b) {
   }
   return out;
 }
+// Подсветка по индексам (линейно, как на ПК)
+// Подсветка по индексам (линейно)
+function updateSelectionHighlightIndices(aIdx, bIdx, cells) {
+  clearSelectionHighlight();
+  if (!cells || !cells.length) return;
+  const a = Math.min(aIdx, bIdx);
+  const b = Math.max(aIdx, bIdx);
+  for (let i = a; i <= b; i++) {
+    const el = cells[i];
+    if (el) {
+      el.classList.add('range-selected');
+      selectionEls.add(el);
+    }
+  }
+}
+
+// Список дат между двумя индексами (включительно)
+function getDsListBetweenIndices(aIdx, bIdx, cells) {
+  const out = [];
+  if (!cells || !cells.length) return out;
+  const a = Math.min(aIdx, bIdx);
+  const b = Math.max(aIdx, bIdx);
+  for (let i = a; i <= b; i++) {
+    const el = cells[i];
+    if (!el) continue;
+    const ds = el.getAttribute && el.getAttribute('data-date');
+    if (ds) out.push(ds);
+  }
+  return out;
+}
+
+
 
 // Прямоугольная подсветка по строкам/колонкам
 function updateSelectionHighlightRect(startRow, startCol, curRow, curCol, cells) {
