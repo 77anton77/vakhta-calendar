@@ -2387,6 +2387,7 @@ function queryFlag(name, def = false) {
 // Тест-кнопки (рисуются всегда)
 // Одна умная кнопка синхронизации
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
+// Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 function addTgTestButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
@@ -2429,7 +2430,7 @@ function addTgTestButton() {
   btn.addEventListener('click', () => {
     if (pending) return;
     const hasWA = !!(window.Telegram && Telegram.WebApp);
-    const forceDeep = queryFlag('forcedeep', false); // ?forcedeep=1 — принудительно дублировать через deep-link
+    const forceDeep = queryFlag('forcedeep', false); // ?forcedeep=1 — дублировать через deep-link
 
     setPending(true, '⏳ Синхронизация…');
     let sendOk = false;
@@ -2476,6 +2477,7 @@ function addTgTestButton() {
 }
 
 
+
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
   try {
@@ -2506,6 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
