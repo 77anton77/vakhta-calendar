@@ -2330,17 +2330,18 @@ function queueTgSync(reason) {
 }
 function sendTgSnapshot(reason) {
   try {
-    const payload = buildExportPayload(true);
-    const envelope = { kind: 'snapshot', data: payload, reason: reason || '' };
+    // короткий пакет: только базовый код (режим + дата начала)
+    const code = buildExportCode(false); // <-- false: без ручных правок
+    const envelope = { kind: 'snapshot-basic', code, reason: reason || '' };
     console.log('[TG] sendData:', envelope);
     if (window.Telegram && Telegram.WebApp) {
       Telegram.WebApp.sendData(JSON.stringify(envelope));
-    } else {
-      // клиент без объекта WebApp — пропускаем (fallback через deep-link вручную)
-      console.warn('[TG] WebApp object not available; use deep-link button.');
     }
-  } catch (e) { console.warn('[TG] sendData error', e); }
+  } catch (e) {
+    console.warn('[TG] sendData error', e);
+  }
 }
+
 
 // Панель действий (гарантия наличия)
 function ensureActionsBar() {
@@ -2503,6 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
