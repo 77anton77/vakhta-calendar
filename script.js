@@ -2387,35 +2387,33 @@ function queryFlag(name, def = false) {
 // Тест-кнопки (рисуются всегда)
 // Одна умная кнопка синхронизации
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
-// Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
-// Одна умная кнопка синхронизации (короткий sendData + опциональный deep-link)
+/// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
 function addTgTestButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
 
-  // убираем старые тест‑кнопки, если были
   actions.querySelectorAll('.tg-test-btn').forEach(b => b.remove());
 
-  // логика видимости
-  const inTG = isTelegramWebApp();                   // открыт в Telegram (по объекту или hash)
-  const forceShow = queryFlag('sync', false);        // ?sync=1 — принудительно показать
+  const inTG = isTelegramWebApp();
+  const forceShow = queryFlag('sync', false);              // ?sync=1 — показать кнопку вне TG
   const forceHide = (new URLSearchParams(location.search).get('sync') === '0'); // ?sync=0 — скрыть
-
   if ((!inTG && !forceShow) || forceHide) return;
 
   const btn = document.createElement('button');
   btn.className = 'tg-test-btn';
-  btn.textContent = '🔄 Синхронизировать с ботом';
+  btn.textContent = '🔄 Синхронировать с ботом';
   btn.title = 'Отправит актуальный календарь боту';
   btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
 
-  // вставляем рядом с "Поделиться" (если есть), иначе в конец actions
   const shareBtn = document.getElementById('share');
   if (shareBtn && shareBtn.parentNode === actions) {
     shareBtn.insertAdjacentElement('afterend', btn);
   } else {
     actions.appendChild(btn);
   }
+
+  // Имя твоего бота — без @
+  const BOT_USERNAME = 'VakhtaCalendarBot';
 
   let pending = false;
   const setPending = (v, label) => {
@@ -2428,16 +2426,17 @@ function addTgTestButton() {
   btn.addEventListener('click', () => {
     if (pending) return;
     const hasWA = !!(window.Telegram && Telegram.WebApp);
-    const forceDeep = queryFlag('forcedeep', false); // ?forcedeep=1 — дублировать через deep-link
+    const forceDeep = queryFlag('forcedeep', false); // ?forcedeep=1 — обязательно продублировать deep-link
 
     setPending(true, '⏳ Синхронизация…');
     let sendOk = false;
 
     try {
-      // 1) КОРОТКИЙ пакет для sendData — только базовый код (режим + дата начала)
+      // КОРОТКИЙ пакет — только базовый код (режим + дата начала)
       const codeBasic = buildExportCode(false);
       const envelope = { kind: 'snapshot-basic', code: codeBasic, reason: 'manual-sync' };
 
+      // Путь 1: WebApp.sendData (если доступен)
       if (hasWA) {
         try {
           Telegram.WebApp.sendData(JSON.stringify(envelope));
@@ -2447,14 +2446,15 @@ function addTgTestButton() {
         }
       }
 
-      // 2) РЕЗЕРВ: deep-link SNAP-<code> тем же коротким кодом
+      // Путь 2: РЕЗЕРВ — deep-link в самого бота через openTelegramLink (внутри Telegram)
       if (!hasWA || forceDeep || !sendOk) {
-        const url = `https://t.me/VakhtaCalendarBot?start=SNAP-${codeBasic}`;
+        const url = `https://t.me/${BOT_USERNAME}?start=SNAP-${codeBasic}`;
         try {
-          if (hasWA && Telegram.WebApp.openLink) {
-            Telegram.WebApp.openLink(url);
+          if (hasWA && Telegram.WebApp.openTelegramLink) {
+            Telegram.WebApp.openTelegramLink(url); // ключевое отличие — открываем внутри Telegram
           } else {
-            window.open(url, '_blank');
+            // последний шанс (вне Telegram), вдруг поможет
+            window.location.href = url;
           }
         } catch {
           window.location.href = url;
@@ -2463,18 +2463,15 @@ function addTgTestButton() {
 
       setPending(false, '✅ Отправлено');
       showToast('Отправлено боту');
-      setTimeout(() => { btn.textContent = '🔄 Синхронилизировать с ботом'; }, 1200);
+      setTimeout(() => { btn.textContent = '🔄 Синхронировать с ботом'; }, 1200);
     } catch (e) {
       console.warn('[TG] sync error:', e);
       setPending(false, '⚠️ Ошибка, повторите');
       showToast('Ошибка синхронизации', 2000);
-      setTimeout(() => { btn.textContent = '🔄 Синхронилизировать с ботом'; }, 1500);
+      setTimeout(() => { btn.textContent = '🔄 Синхронировать с ботом'; }, 1500);
     }
   });
 }
-
-
-
 
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
@@ -2506,6 +2503,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
