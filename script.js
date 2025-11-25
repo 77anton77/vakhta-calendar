@@ -1325,10 +1325,8 @@ function openBulkEditModalForRange() {
   const noteWrap = modal.querySelector('#bulk-note-wrap');
   const noteInput = modal.querySelector('#bulk-note');
 
-  try {
-    const saved = localStorage.getItem('lastBulkStatus') || 'auto';
-    selectEl.value = saved;
-  } catch {}
+  // всегда по умолчанию "Автоматически"
+  selectEl.value = 'auto';
 
   const sync = () => {
     if (noteWrap) noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none';
@@ -1340,7 +1338,7 @@ function openBulkEditModalForRange() {
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
-    try { localStorage.setItem('lastBulkStatus', val); } catch {}
+    // не сохраняем прошлый выбор в localStorage
     const noteText = (noteInput && noteInput.value || '').trim();
 
     dsList.forEach(ds => {
@@ -1436,11 +1434,7 @@ function openBulkEditModalForDs(dsList) {
   const noteWrap = modal.querySelector('#bulk-note-wrap');
   const noteInput = modal.querySelector('#bulk-note');
 
-  try {
-    const saved = localStorage.getItem('lastBulkStatus') || 'auto';
-    selectEl.value = saved;
-  } catch {}
-
+  selectEl.value = 'auto';
   const sync = () => { noteWrap.style.display = (selectEl.value === 'business-trip') ? '' : 'none'; };
   sync();
   selectEl.addEventListener('change', sync);
@@ -1449,7 +1443,7 @@ function openBulkEditModalForDs(dsList) {
 
   modal.querySelector('#bulk-apply').addEventListener('click', () => {
     const val = selectEl.value;
-    try { localStorage.setItem('lastBulkStatus', val); } catch {}
+    
     const noteText = (noteInput && noteInput.value || '').trim();
 
     dsList.forEach(ds => {
