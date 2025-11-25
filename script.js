@@ -2331,9 +2331,8 @@ function queueTgSync(reason) {
 function sendTgSnapshot(reason) {
   try {
     // короткий пакет: только базовый код (режим + дата начала)
-    const code = buildExportCode(false); // <-- false: без ручных правок
+    const code = buildExportCode(false);
     const envelope = { kind: 'snapshot-basic', code, reason: reason || '' };
-    console.log('[TG] sendData:', envelope);
     if (window.Telegram && Telegram.WebApp) {
       Telegram.WebApp.sendData(JSON.stringify(envelope));
     }
@@ -2341,6 +2340,7 @@ function sendTgSnapshot(reason) {
     console.warn('[TG] sendData error', e);
   }
 }
+
 
 
 // Панель действий (гарантия наличия)
@@ -2504,6 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
