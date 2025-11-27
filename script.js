@@ -2328,17 +2328,21 @@ function queueTgSync(reason) {
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
   tgSyncTimer = setTimeout(() => sendTgSnapshot(reason), 1200);
 }
-function sendTgSnapshot(reason) {
+async function sendTgSnapshot(reason) {
   try {
-    const code = buildExportCode(false);
-    const envBasic = { kind: 'snapshot-basic', code, reason: reason || '' };
-    if (window.Telegram && Telegram.WebApp) {
-      try { Telegram.WebApp.sendData(JSON.stringify(envBasic)); } catch (e) {}
-    }
-    const fullJson = JSON.stringify(buildExportPayload(true));
-    sendFullSnapshotChunked(fullJson, reason);
-  } catch (e) { console.warn('[TG] sendTgSnapshot fatal:', e); }
+    // initData есть только внутри Telegram; в обычном браузере будет пусто
+    const initData = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || '';
+    const snapshot = buildExportPayload(true); // полный снимок (включая ручные правки)
+    await fetch('https://myvakhta.duckdns.org/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData, snapshot, reason: reason || '' })
+    });
+  } catch (e) {
+    console.warn('[SYNC] fetch error:', e);
+  }
 }
+
 
 function sendFullSnapshotChunked(fullJson, reason) {
   if (!(window.Telegram && Telegram.WebApp)) return;
@@ -2440,6 +2444,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
