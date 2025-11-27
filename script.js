@@ -2420,9 +2420,9 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
-function addTgTestButton() {
-  const actions = ensureActionsBar();
-  if (!actions) return;
+function addTgTestButton() { /* отключено в проде */ }
+
+
 
   actions.querySelectorAll('.tg-test-btn').forEach(b => b.remove());
 
@@ -2535,6 +2535,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
