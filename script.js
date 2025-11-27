@@ -2318,54 +2318,37 @@ function openShareModal() {
 // ========================
 // Автосинхронизация (TG)
 // ========================
+// ========================
+// Автосинхронизация (TG) — шлём ТОЛЬКО если есть initData
+// ========================
 let tgSyncTimer = null;
-function isTGWebApp() {
-  // используем тот же детектор
-  return isTelegramWebApp();
+
+function hasInitData() {
+  return !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData);
 }
+
 function queueTgSync(reason) {
-  if (!isTGWebApp()) return;
+  if (!hasInitData()) return;                  // вне Telegram — не шлём (иначе на сервере 403)
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
   tgSyncTimer = setTimeout(() => sendTgSnapshot(reason), 1200);
 }
+
 async function sendTgSnapshot(reason) {
   try {
-    // initData есть только внутри Telegram; в обычном браузере будет пусто
-    const initData = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || '';
-    const snapshot = buildExportPayload(true); // полный снимок (включая ручные правки)
-    await fetch('https://myvakhta.duckdns.org/sync', {
+    const initData = Telegram.WebApp.initData || '';
+    if (!initData) return;                     // дополнительная защита
+    const snapshot = buildExportPayload(true);
+    const res = await fetch('https://myvakhta.duckdns.org/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData, snapshot, reason: reason || '' })
     });
+    // Небольшая диагностика: если что-то пошло не так — видно статус
+    if (!res.ok) console.warn('[SYNC] HTTP', res.status);
   } catch (e) {
     console.warn('[SYNC] fetch error:', e);
   }
 }
-
-
-function sendFullSnapshotChunked(fullJson, reason) {
-  if (!(window.Telegram && Telegram.WebApp)) return;
-  const MAX = 2800; // безопасный размер части
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-  const total = Math.ceil(fullJson.length / MAX);
-  for (let i = 0; i < total; i++) {
-    const chunk = fullJson.slice(i*MAX, (i+1)*MAX);
-    const env = {
-      kind: 'snapshot-full-part',
-      id,
-      part: i + 1,
-      total,
-      reason: reason || '',
-      data: chunk
-    };
-    try { Telegram.WebApp.sendData(JSON.stringify(env)); } catch (e) {}
-  }
-}
-
-
-
-
 // Панель действий (гарантия наличия)
 function ensureActionsBar() {
   let actions = document.querySelector('.actions');
@@ -2444,6 +2427,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
