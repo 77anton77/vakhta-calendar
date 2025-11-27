@@ -2410,7 +2410,6 @@ function queryFlag(name, def = false) {
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
 function addTgTestButton() { /* отключено в проде */ }
 
-
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
   try {
@@ -2441,6 +2440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
