@@ -2339,18 +2339,6 @@ function sendTgSnapshot(reason) {
     sendFullSnapshotChunked(fullJson, reason);
   } catch (e) { console.warn('[TG] sendTgSnapshot fatal:', e); }
 }
-function sendFullSnapshotChunked(fullJson, reason) {
-  if (!(window.Telegram && Telegram.WebApp)) return;
-  const MAX = 2800;
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-  const total = Math.ceil(fullJson.length / MAX);
-  for (let i = 0; i < total; i++) {
-    const chunk = fullJson.slice(i*MAX, (i+1)*MAX);
-    const env = { kind:'snapshot-full-part', id, part:i+1, total, reason:reason||'', data:chunk };
-    try { Telegram.WebApp.sendData(JSON.stringify(env)); } catch (e) {}
-  }
-}
-
 
 function sendFullSnapshotChunked(fullJson, reason) {
   if (!(window.Telegram && Telegram.WebApp)) return;
@@ -2421,28 +2409,6 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
 function addTgTestButton() { /* отключено в проде */ }
-
-
-
-  actions.querySelectorAll('.tg-test-btn').forEach(b => b.remove());
-
-  const inTG = isTelegramWebApp();
-  const forceShow = queryFlag('sync', false);              // ?sync=1 — показать кнопку вне TG
-  const forceHide = (new URLSearchParams(location.search).get('sync') === '0'); // ?sync=0 — скрыть
-  if ((!inTG && !forceShow) || forceHide) return;
-
-  const btn = document.createElement('button');
-  btn.className = 'tg-test-btn';
-  btn.textContent = '🔄 Синхронировать с ботом';
-  btn.title = 'Отправит актуальный календарь боту';
-  btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-
-  const shareBtn = document.getElementById('share');
-  if (shareBtn && shareBtn.parentNode === actions) {
-    shareBtn.insertAdjacentElement('afterend', btn);
-  } else {
-    actions.appendChild(btn);
-  }
 
   // Имя твоего бота — без @
   const BOT_USERNAME = 'VakhtaCalendarBot';
@@ -2535,6 +2501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
