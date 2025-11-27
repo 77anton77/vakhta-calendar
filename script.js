@@ -2330,20 +2330,27 @@ function queueTgSync(reason) {
 }
 function sendTgSnapshot(reason) {
   try {
-    // 1) короткий пакет (влезает в лимит): режим + дата старта
     const code = buildExportCode(false);
     const envBasic = { kind: 'snapshot-basic', code, reason: reason || '' };
     if (window.Telegram && Telegram.WebApp) {
       try { Telegram.WebApp.sendData(JSON.stringify(envBasic)); } catch (e) {}
     }
-
-    // 2) полный снимок — кусками (учёт ручных правок и заметок)
     const fullJson = JSON.stringify(buildExportPayload(true));
     sendFullSnapshotChunked(fullJson, reason);
-  } catch (e) {
-    console.warn('[TG] sendTgSnapshot fatal:', e);
+  } catch (e) { console.warn('[TG] sendTgSnapshot fatal:', e); }
+}
+function sendFullSnapshotChunked(fullJson, reason) {
+  if (!(window.Telegram && Telegram.WebApp)) return;
+  const MAX = 2800;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const total = Math.ceil(fullJson.length / MAX);
+  for (let i = 0; i < total; i++) {
+    const chunk = fullJson.slice(i*MAX, (i+1)*MAX);
+    const env = { kind:'snapshot-full-part', id, part:i+1, total, reason:reason||'', data:chunk };
+    try { Telegram.WebApp.sendData(JSON.stringify(env)); } catch (e) {}
   }
 }
+
 
 function sendFullSnapshotChunked(fullJson, reason) {
   if (!(window.Telegram && Telegram.WebApp)) return;
@@ -2528,6 +2535,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
