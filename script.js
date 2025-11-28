@@ -1346,38 +1346,31 @@ function openBulkEditModalForRange() {
 
   const closeModal = () => document.body.removeChild(modal);
 
- modal.querySelector('#bulk-apply').addEventListener('click', () => {
-  const val = selectEl.value;
-  const noteText = (noteInput && noteInput.value || '').trim();
+  modal.querySelector('#bulk-apply').addEventListener('click', () => {
+    const val = selectEl.value;
+    const noteText = (noteInput && noteInput.value || '').trim();
 
-  dsList.forEach(ds => {
-    if (val === 'auto') {
-      delete manualOverrides[ds];
-      delete manualNotes[ds];
-    } else {
-      manualOverrides[ds] = val;
-      if (val === 'business-trip') {
-        if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
-      } else {
+    dsList.forEach(ds => {
+      if (val === 'auto') {
+        delete manualOverrides[ds];
         delete manualNotes[ds];
+      } else {
+        manualOverrides[ds] = val;
+        if (val === 'business-trip') {
+          if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
+        } else {
+          delete manualNotes[ds];
+        }
       }
-    }
+    });
+
+    saveData();
+    clearSelectionHighlight();
+    renderCalendar();
+    closeModal();
+    // НЕМЕДЛЕННАЯ синхронизация
+    queueTgSync('bulk');
   });
-
-  saveData();
-  clearSelectionHighlight();
-  renderCalendar();
-  closeModal();
-  // НЕМЕДЛЕННАЯ синхронизация
-  queueTgSync('bulk');
-});
-
-  saveData();
-  clearSelectionHighlight();
-  renderCalendar();
-  closeModal();
-  queueTgSync('bulk'); // Была задержка
-});
 
   modal.querySelector('#bulk-cancel').addEventListener('click', () => {
     clearSelectionHighlight();
@@ -2501,6 +2494,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
