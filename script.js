@@ -2351,21 +2351,17 @@ function openShareModal() {
 }
 
 
-// ========================
-// Автосинхронизация (TG) — шлём ТОЛЬКО если есть initData
-// ========================
+ 
 // ========================
 // Автосинхронизация (TG) — УПРОЩЕННАЯ ВЕРСИЯ
+// ========================
+// ========================
+// Автосинхронизация (TG) — УЛУЧШЕННАЯ ВЕРСИЯ
 // ========================
 let tgSyncTimer = null;
 
 function hasInitData() {
-  // Более надежная проверка
-  try {
-    return !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData && Telegram.WebApp.initData.length > 10);
-  } catch {
-    return false;
-  }
+  return !!(window.Telegram?.WebApp?.initData);
 }
 
 function queueTgSync(reason) {
@@ -2376,25 +2372,23 @@ function queueTgSync(reason) {
     return;
   }
   
+  // Дебаунс - отменяем предыдущий таймер, ставим новый
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
-  
-  // СРАЗУ отправляем, без задержки
-  sendTgSnapshot(reason);
-  
-  // И дополнительно ставим таймер на случай, если есть множественные быстрые изменения
   tgSyncTimer = setTimeout(() => {
-    sendTgSnapshot(reason + '-delayed');
-  }, 500);
+    sendTgSnapshot(reason);
+    tgSyncTimer = null;
+  }, 300); // 300ms дебаунс вместо 500+немедленной отправки
 }
 
 async function sendTgSnapshot(reason) {
+  // Явная проверка вместо try/catch
+  if (!window.Telegram?.WebApp?.initData) {
+    console.warn('[SYNC] No Telegram WebApp initData');
+    return;
+  }
+  
   try {
-    const initData = Telegram.WebApp.initData || '';
-    if (!initData) {
-      console.warn('[SYNC] no initData at send');
-      return;
-    }
-    
+    const initData = Telegram.WebApp.initData;
     const snapshot = buildExportPayload(true);
     console.log('[SYNC] Sending snapshot, reason:', reason);
     
@@ -2411,13 +2405,11 @@ async function sendTgSnapshot(reason) {
     
     if (!res.ok) {
       console.warn('[SYNC] HTTP error:', res.status);
-      // Показываем ошибку только в debug режиме
       if (queryFlag('debug')) {
         showToast('Ошибка синхронизации: ' + res.status, 2000);
       }
     } else {
       console.log('[SYNC] Success');
-      // Краткое подтверждение в debug режиме
       if (queryFlag('debug')) {
         showToast('✓ Синхронизировано', 1000);
       }
@@ -2477,12 +2469,16 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
 function addTgTestButton() {
+  // Показываем тест-кнопку ТОЛЬКО в WebApp
+  if (!hasInitData()) return;
+  
   const actions = ensureActionsBar();
   if (!actions) return;
+  
   const btn = document.createElement('button');
   btn.textContent = '🔄 Синхронизировать (тест)';
   btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-  btn.onclick = () => sendTgSnapshot('manual-test');
+  btn.onclick = () => queueTgSync('manual-test'); // Используем queueTgSync вместо sendTgSnapshot
   actions.appendChild(btn);
 }
 
@@ -2517,6 +2513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
