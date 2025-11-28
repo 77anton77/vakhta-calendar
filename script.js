@@ -2368,22 +2368,35 @@ function openShareModal() {
 let tgSyncTimer = null;
 
 function getInitDataFromAnywhere() {
-  // Пробуем из Telegram.WebApp
+  console.log('=== SEARCHING INITDATA ===');
+  
+  // 1. Пробуем из Telegram.WebApp
   if (window.Telegram?.WebApp?.initData) {
+    console.log('Found in Telegram.WebApp.initData');
     return Telegram.WebApp.initData;
   }
+  console.log('Telegram.WebApp.initData: NOT FOUND');
   
-  // Пробуем из hash URL
+  // 2. Пробуем из hash URL
   const hash = window.location.hash.slice(1);
+  console.log('URL hash:', hash);
   const params = new URLSearchParams(hash);
   const tgWebAppData = params.get('tgWebAppData');
-  if (tgWebAppData) return tgWebAppData;
+  if (tgWebAppData) {
+    console.log('Found in hash as tgWebAppData');
+    return tgWebAppData;
+  }
   
-  // Пробуем из query параметров  
+  // 3. Пробуем из query параметров  
   const urlParams = new URLSearchParams(window.location.search);
+  console.log('URL search:', window.location.search);
   const initData = urlParams.get('initData');
-  if (initData) return initData;
+  if (initData) {
+    console.log('Found in search as initData');
+    return initData;
+  }
   
+  console.log('=== INITDATA NOT FOUND ANYWHERE ===');
   return '';
 }
 
@@ -2553,6 +2566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
