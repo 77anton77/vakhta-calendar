@@ -2315,9 +2315,7 @@ function openShareModal() {
   content.querySelector('#print-year').addEventListener('click', () => { safeClose(); tryPrint('year'); });
 }
 
-// ========================
-// Автосинхронизация (TG)
-// ========================
+
 // ========================
 // Автосинхронизация (TG) — шлём ТОЛЬКО если есть initData
 // ========================
@@ -2328,7 +2326,11 @@ function hasInitData() {
 }
 
 function queueTgSync(reason) {
-  if (!hasInitData()) return;                  // вне Telegram — не шлём (иначе на сервере 403)
+  if (!hasInitData()) {
+    // Чтобы было видно в тесте, что мы вне Telegram
+    console.warn('[SYNC] skipped: no initData');
+    return;
+  }
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
   tgSyncTimer = setTimeout(() => sendTgSnapshot(reason), 1200);
 }
@@ -2336,19 +2338,28 @@ function queueTgSync(reason) {
 async function sendTgSnapshot(reason) {
   try {
     const initData = Telegram.WebApp.initData || '';
-    if (!initData) return;                     // дополнительная защита
+    if (!initData) {
+      console.warn('[SYNC] no initData at send');
+      return;
+    }
     const snapshot = buildExportPayload(true);
     const res = await fetch('https://myvakhta.duckdns.org/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData, snapshot, reason: reason || '' })
     });
-    // Небольшая диагностика: если что-то пошло не так — видно статус
-    if (!res.ok) console.warn('[SYNC] HTTP', res.status);
+    if (!res.ok) {
+      console.warn('[SYNC] HTTP', res.status);
+      // на время отладки можно подсветить статус
+      // showToast('sync ' + res.status, 1500);
+    } else {
+      // showToast('sync 200', 1000);
+    }
   } catch (e) {
     console.warn('[SYNC] fetch error:', e);
   }
 }
+
 // Панель действий (гарантия наличия)
 function ensureActionsBar() {
   let actions = document.querySelector('.actions');
@@ -2427,6 +2438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
