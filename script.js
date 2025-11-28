@@ -349,10 +349,18 @@ function initCalendar() {
   setupSwipeNavigation();
   updateLegendVisibility();
   updateScheduleButtonText();
-  ensureActionsBar();   // гарантируем панель для тест-кнопок
-  addTgTestButton();    // рисуем тест‑кнопки TG
+  ensureActionsBar();
+  addTgTestButton();
   processPrintParams();
-  showDebugBanner();    // маленький бейдж диагностики
+  showDebugBanner();
+  
+  // === ДОБАВЬТЕ ЭТИ 5 СТРОКИ В КОНЕЦ ФУНКЦИИ ===
+  // Синхронизация при старте (если есть данные)
+  if (vakhtaStartDate && hasInitData()) {
+    setTimeout(() => {
+      queueTgSync('initial-load');
+    }, 1000);
+  }
 }
 
 // Улучшенный детектор WebApp: объект или hash-параметры
@@ -583,18 +591,19 @@ function setVakhtaStartDate() {
   });
 
   modal.querySelector('#confirm-date').addEventListener('click', () => {
-    if (dateInput.value) {
-      const inputDate = parseYMDLocal(dateInput.value);
-      if (!isNaN(inputDate.getTime())) {
-        vakhtaStartDate = inputDate;
-        saveData();
-        renderCalendar();
-        alert(`Дата начала вахты установлена: ${inputDate.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' })}`);
-        queueTgSync('set-start');
-      }
+  if (dateInput.value) {
+    const inputDate = parseYMDLocal(dateInput.value);
+    if (!isNaN(inputDate.getTime())) {
+      vakhtaStartDate = inputDate;
+      saveData();
+      renderCalendar();
+      alert(`Дата начала вахты установлена: ${inputDate.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' })}`);
+      // НЕМЕДЛЕННАЯ синхронизация
+      queueTgSync('set-start');
     }
-    document.body.removeChild(modal);
-  });
+  }
+  document.body.removeChild(modal);
+});
 
   modal.querySelector('#cancel-date').addEventListener('click', () => {
     document.body.removeChild(modal);
@@ -750,24 +759,25 @@ function editDayManually(date) {
   select.addEventListener('change', syncNoteVisibility);
 
   modal.querySelector('#save-edit').addEventListener('click', () => {
-    const val = select.value;
-    if (val === 'auto') {
-      delete manualOverrides[dateStr];
-      delete manualNotes[dateStr];
+  const val = select.value;
+  if (val === 'auto') {
+    delete manualOverrides[dateStr];
+    delete manualNotes[dateStr];
+  } else {
+    manualOverrides[dateStr] = val;
+    if (val === 'business-trip') {
+      const t = (noteInput.value || '').trim();
+      if (t) manualNotes[dateStr] = t; else delete manualNotes[dateStr];
     } else {
-      manualOverrides[dateStr] = val;
-      if (val === 'business-trip') {
-        const t = (noteInput.value || '').trim();
-        if (t) manualNotes[dateStr] = t; else delete manualNotes[dateStr];
-      } else {
-        delete manualNotes[dateStr];
-      }
+      delete manualNotes[dateStr];
     }
-    saveData();
-    renderCalendar();
-    document.body.removeChild(modal);
-    queueTgSync('edit-day');
-  });
+  }
+  saveData();
+  renderCalendar();
+  document.body.removeChild(modal);
+  // НЕМЕДЛЕННАЯ синхронизация
+  queueTgSync('edit-day');
+});
 
   if (manualOverrides[dateStr]) {
     const btn = modal.querySelector('#reset-edit');
@@ -1336,31 +1346,38 @@ function openBulkEditModalForRange() {
 
   const closeModal = () => document.body.removeChild(modal);
 
-  modal.querySelector('#bulk-apply').addEventListener('click', () => {
-    const val = selectEl.value;
-    // не сохраняем прошлый выбор в localStorage
-    const noteText = (noteInput && noteInput.value || '').trim();
+ modal.querySelector('#bulk-apply').addEventListener('click', () => {
+  const val = selectEl.value;
+  const noteText = (noteInput && noteInput.value || '').trim();
 
-    dsList.forEach(ds => {
-      if (val === 'auto') {
-        delete manualOverrides[ds];
-        delete manualNotes[ds];
+  dsList.forEach(ds => {
+    if (val === 'auto') {
+      delete manualOverrides[ds];
+      delete manualNotes[ds];
+    } else {
+      manualOverrides[ds] = val;
+      if (val === 'business-trip') {
+        if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
       } else {
-        manualOverrides[ds] = val;
-        if (val === 'business-trip') {
-          if (noteText) manualNotes[ds] = noteText; else delete manualNotes[ds];
-        } else {
-          delete manualNotes[ds];
-        }
+        delete manualNotes[ds];
       }
-    });
-
-    saveData();
-    clearSelectionHighlight();
-    renderCalendar();
-    closeModal();
-    queueTgSync('bulk');
+    }
   });
+
+  saveData();
+  clearSelectionHighlight();
+  renderCalendar();
+  closeModal();
+  // НЕМЕДЛЕННАЯ синхронизация
+  queueTgSync('bulk');
+});
+
+  saveData();
+  clearSelectionHighlight();
+  renderCalendar();
+  closeModal();
+  queueTgSync('bulk'); // Была задержка
+});
 
   modal.querySelector('#bulk-cancel').addEventListener('click', () => {
     clearSelectionHighlight();
@@ -1908,15 +1925,16 @@ function showScheduleSelector() {
   document.body.appendChild(modal);
 
   modal.querySelectorAll('.schedule-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentSchedule = btn.getAttribute('data-value');
-      saveData();
-      renderCalendar();
-      updateScheduleButtonTextSafe();
-      document.body.removeChild(modal);
-      queueTgSync('schedule');
-    });
+  btn.addEventListener('click', () => {
+    currentSchedule = btn.getAttribute('data-value');
+    saveData();
+    renderCalendar();
+    updateScheduleButtonTextSafe();
+    document.body.removeChild(modal);
+    // НЕМЕДЛЕННАЯ синхронизация
+    queueTgSync('schedule');
   });
+});
 
   const savedGesture = localStorage.getItem('editGestureMode') || 'double';
   const savedRadio = modal.querySelector(`input[name="edit-gesture"][value="${savedGesture}"]`);
@@ -1946,6 +1964,7 @@ function resetManualChanges() {
     saveData();
     renderCalendar();
     alert('Все ручные изменения сброшены');
+    // НЕМЕДЛЕННАЯ синхронизация
     queueTgSync('reset');
   }
 }
@@ -2319,20 +2338,37 @@ function openShareModal() {
 // ========================
 // Автосинхронизация (TG) — шлём ТОЛЬКО если есть initData
 // ========================
+// ========================
+// Автосинхронизация (TG) — УПРОЩЕННАЯ ВЕРСИЯ
+// ========================
 let tgSyncTimer = null;
 
 function hasInitData() {
-  return !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData);
+  // Более надежная проверка
+  try {
+    return !!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData && Telegram.WebApp.initData.length > 10);
+  } catch {
+    return false;
+  }
 }
 
 function queueTgSync(reason) {
+  console.log('[SYNC] Queueing sync, reason:', reason, 'hasInitData:', hasInitData());
+  
   if (!hasInitData()) {
-    // Чтобы было видно в тесте, что мы вне Telegram
     console.warn('[SYNC] skipped: no initData');
     return;
   }
+  
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
-  tgSyncTimer = setTimeout(() => sendTgSnapshot(reason), 1200);
+  
+  // СРАЗУ отправляем, без задержки
+  sendTgSnapshot(reason);
+  
+  // И дополнительно ставим таймер на случай, если есть множественные быстрые изменения
+  tgSyncTimer = setTimeout(() => {
+    sendTgSnapshot(reason + '-delayed');
+  }, 500);
 }
 
 async function sendTgSnapshot(reason) {
@@ -2342,21 +2378,39 @@ async function sendTgSnapshot(reason) {
       console.warn('[SYNC] no initData at send');
       return;
     }
+    
     const snapshot = buildExportPayload(true);
+    console.log('[SYNC] Sending snapshot, reason:', reason);
+    
     const res = await fetch('https://myvakhta.duckdns.org/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData, snapshot, reason: reason || '' })
+      body: JSON.stringify({ 
+        initData, 
+        snapshot, 
+        reason: reason || 'auto',
+        timestamp: new Date().toISOString()
+      })
     });
+    
     if (!res.ok) {
-      console.warn('[SYNC] HTTP', res.status);
-      // на время отладки можно подсветить статус
-      // showToast('sync ' + res.status, 1500);
+      console.warn('[SYNC] HTTP error:', res.status);
+      // Показываем ошибку только в debug режиме
+      if (queryFlag('debug')) {
+        showToast('Ошибка синхронизации: ' + res.status, 2000);
+      }
     } else {
-      // showToast('sync 200', 1000);
+      console.log('[SYNC] Success');
+      // Краткое подтверждение в debug режиме
+      if (queryFlag('debug')) {
+        showToast('✓ Синхронизировано', 1000);
+      }
     }
   } catch (e) {
     console.warn('[SYNC] fetch error:', e);
+    if (queryFlag('debug')) {
+      showToast('Ошибка сети', 2000);
+    }
   }
 }
 
@@ -2447,6 +2501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
