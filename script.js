@@ -2360,14 +2360,35 @@ function openShareModal() {
 // ========================
 let tgSyncTimer = null;
 
+function getInitDataFromAnywhere() {
+  // Пробуем из Telegram.WebApp
+  if (window.Telegram?.WebApp?.initData) {
+    return Telegram.WebApp.initData;
+  }
+  
+  // Пробуем из hash URL
+  const hash = window.location.hash.slice(1);
+  const params = new URLSearchParams(hash);
+  const tgWebAppData = params.get('tgWebAppData');
+  if (tgWebAppData) return tgWebAppData;
+  
+  // Пробуем из query параметров  
+  const urlParams = new URLSearchParams(window.location.search);
+  const initData = urlParams.get('initData');
+  if (initData) return initData;
+  
+  return '';
+}
+
 function hasInitData() {
-  return !!(window.Telegram?.WebApp?.initData);
+  return !!getInitDataFromAnywhere();
 }
 
 function queueTgSync(reason) {
-  console.log('[SYNC] Queueing sync, reason:', reason, 'hasInitData:', hasInitData());
+  const initData = getInitDataFromAnywhere();
+  console.log('[SYNC] Queueing sync, reason:', reason, 'initData length:', initData.length);
   
-  if (!hasInitData()) {
+  if (!initData) {
     console.warn('[SYNC] skipped: no initData');
     return;
   }
@@ -2525,6 +2546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
