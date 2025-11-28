@@ -2406,7 +2406,16 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
-function addTgTestButton() { /* отключено в проде */ }
+function addTgTestButton() {
+  const actions = ensureActionsBar();
+  if (!actions) return;
+  const btn = document.createElement('button');
+  btn.textContent = '🔄 Синхронизировать (тест)';
+  btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
+  btn.onclick = () => sendTgSnapshot('manual-test');
+  actions.appendChild(btn);
+}
+
 
 // Маленький отладочный бейдж внизу
 function showDebugBanner() {
@@ -2438,6 +2447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
