@@ -574,10 +574,15 @@ function setVakhtaStartDate() {
         <button id="quick-today" style="width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;">Выбрать сегодня</button>
       </div>
       <input type="date" id="date-input" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px;">
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
         <button id="confirm-date" style="flex: 1; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 5px;">OK</button>
         <button id="cancel-date" style="flex: 1; padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 5px;">Отмена</button>
       </div>
+      ${vakhtaStartDate ? `
+        <div style="border-top: 1px solid #eee; padding-top: 10px;">
+          <button id="delete-graph" style="width: 100%; padding: 10px; background: #e67e22; color: white; border: none; border-radius: 5px;">🗑️ Удалить график</button>
+        </div>
+      ` : ''}
     </div>
   `;
   document.body.appendChild(modal);
@@ -591,19 +596,37 @@ function setVakhtaStartDate() {
   });
 
   modal.querySelector('#confirm-date').addEventListener('click', () => {
-  if (dateInput.value) {
-    const inputDate = parseYMDLocal(dateInput.value);
-    if (!isNaN(inputDate.getTime())) {
-      vakhtaStartDate = inputDate;
-      saveData();
-      renderCalendar();
-      alert(`Дата начала вахты установлена: ${inputDate.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' })}`);
-      // НЕМЕДЛЕННАЯ синхронизация
-      queueTgSync('set-start');
+    if (dateInput.value) {
+      const inputDate = parseYMDLocal(dateInput.value);
+      if (!isNaN(inputDate.getTime())) {
+        vakhtaStartDate = inputDate;
+        saveData();
+        renderCalendar();
+        alert(`Дата начала вахты установлена: ${inputDate.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' })}`);
+        // НЕМЕДЛЕННАЯ синхронизация
+        queueTgSync('set-start');
+      }
     }
+    document.body.removeChild(modal);
+  });
+
+  // Обработчик кнопки "Удалить график"
+  const deleteBtn = modal.querySelector('#delete-graph');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      if (confirm('Вы уверены, что хотите удалить весь график? Все данные будут сброшены.')) {
+        vakhtaStartDate = null;
+        manualOverrides = {};
+        manualNotes = {};
+        saveData();
+        renderCalendar();
+        alert('График удалён');
+        // НЕМЕДЛЕННАЯ синхронизация
+        queueTgSync('delete-graph');
+        document.body.removeChild(modal);
+      }
+    });
   }
-  document.body.removeChild(modal);
-});
 
   modal.querySelector('#cancel-date').addEventListener('click', () => {
     document.body.removeChild(modal);
@@ -2494,6 +2517,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
