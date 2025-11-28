@@ -353,6 +353,13 @@ function initCalendar() {
   addTgTestButton();
   processPrintParams();
   showDebugBanner();
+  // Показываем статус синхронизации
+  setTimeout(() => {
+    const status = document.createElement('div');
+    status.style.cssText = 'position:fixed; top:10px; right:10px; background:#000; color:#fff; padding:5px; z-index:1000; font-size:12px;';
+    status.textContent = 'Sync: ' + (hasInitData() ? 'READY' : 'NO DATA');
+    document.body.appendChild(status);
+  }, 1000);
   
   // === ДОБАВЬТЕ ЭТИ 5 СТРОКИ В КОНЕЦ ФУНКЦИИ ===
   // Синхронизация при старте (если есть данные)
@@ -2546,6 +2553,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
