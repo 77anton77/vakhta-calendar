@@ -351,6 +351,7 @@ function initCalendar() {
   updateScheduleButtonText();
   ensureActionsBar();
   addTgTestButton();
+  addDebugSyncButton(); // видно только при ?debug=1
   processPrintParams();
   showDebugBanner();
   // Показываем статус синхронизации
@@ -2401,6 +2402,7 @@ function hasInitData() {
 
 function queueTgSync(reason) {
   const initData = getInitDataFromAnywhere();
+  dbg('Q:' + reason + ' init=' + (initData ? '1' : '0'));
 
   // дебаунс (мягкая задержка, чтобы не слать пачками)
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
@@ -2411,9 +2413,12 @@ function queueTgSync(reason) {
 }
 
 async function doSync(reason, initData) {
+  dbg('doSync:' + (reason || ''));
+
   // 1) Если есть initData — шлём на HTTPS /sync (не сворачивает WebView)
   if (initData) {
     try {
+      dbg('POST /sync…');
       const snapshot = buildExportPayload(true);
       const res = await fetch('https://myvakhta.duckdns.org/sync', {
         method: 'POST',
@@ -2426,15 +2431,15 @@ async function doSync(reason, initData) {
         })
       });
       if (!res.ok) {
+        dbg('HTTP ' + res.status);
         console.warn('[SYNC] HTTP error:', res.status);
-        if (queryFlag('debug')) showToast('Ошибка синхронизации: ' + res.status, 2000);
       } else {
-        if (queryFlag('debug')) showToast('✓ Синхронизировано', 1000);
+        dbg('OK');
       }
       return;
     } catch (e) {
+      dbg('ERR fetch');
       console.warn('[SYNC] fetch error:', e);
-      if (queryFlag('debug')) showToast('Ошибка сети', 2000);
       return;
     }
   }
@@ -2452,12 +2457,13 @@ async function doSync(reason, initData) {
       const code = buildExportCode(false); // короткий (basic)
       const envelope = { kind: 'snapshot-basic', code, reason: reason || 'auto-fallback' };
       Telegram.WebApp.sendData(JSON.stringify(envelope));
-      if (queryFlag('debug')) showToast('↪ fallback sendData', 1200);
+      dbg('↪ fallback sendData');
     }
   } catch (e) {
     console.warn('[SYNC] sendData fallback error:', e);
   }
 }
+
 
 
 // Панель действий (гарантия наличия)
@@ -2477,6 +2483,17 @@ function ensureActionsBar() {
   }
   return actions;
 }
+function addDebugSyncButton() {
+  if (!queryFlag('debug', false)) return;
+  const actions = ensureActionsBar();
+  if (!actions) return;
+  const btn = document.createElement('button');
+  btn.textContent = '⏫ Отправить снимок (debug)';
+  btn.style.cssText = 'padding:6px 10px; background:#6c5ce7; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
+  btn.onclick = () => queueTgSync('manual-debug');
+  actions.appendChild(btn);
+}
+
 // показать короткое уведомление (тост)
 function showToast(msg, ms = 1800) {
   try {
@@ -2501,6 +2518,13 @@ function queryFlag(name, def = false) {
     return /^(1|true|yes)$/i.test(v);
   } catch { return def; }
 }
+
+function dbg(msg) {
+  try {
+    if (queryFlag('debug', false)) showToast(String(msg), 1400);
+  } catch {}
+}
+
 
 // Тест-кнопки (рисуются всегда)
 // Одна умная кнопка синхронизации
@@ -2540,6 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
