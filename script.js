@@ -2359,44 +2359,39 @@ function openShareModal() {
 
 
  
+
 // ========================
-// Автосинхронизация (TG) — УПРОЩЕННАЯ ВЕРСИЯ
-// ========================
-// ========================
-// Автосинхронизация (TG) — УЛУЧШЕННАЯ ВЕРСИЯ
+// Автосинхронизация (TG)
 // ========================
 let tgSyncTimer = null;
 
+// Можно включать fallback через URL: ?sdfallback=1
+function sendDataFallbackEnabled() {
+  try {
+    const v = new URLSearchParams(location.search).get('sdfallback');
+    return /^(1|true|yes)$/i.test(v);
+  } catch { return false; }
+}
+
 function getInitDataFromAnywhere() {
-  console.log('=== SEARCHING INITDATA ===');
-  
-  // 1. Пробуем из Telegram.WebApp
-  if (window.Telegram?.WebApp?.initData) {
-    console.log('Found in Telegram.WebApp.initData');
-    return Telegram.WebApp.initData;
-  }
-  console.log('Telegram.WebApp.initData: NOT FOUND');
-  
-  // 2. Пробуем из hash URL
-  const hash = window.location.hash.slice(1);
-  console.log('URL hash:', hash);
-  const params = new URLSearchParams(hash);
-  const tgWebAppData = params.get('tgWebAppData');
-  if (tgWebAppData) {
-    console.log('Found in hash as tgWebAppData');
-    return tgWebAppData;
-  }
-  
-  // 3. Пробуем из query параметров  
-  const urlParams = new URLSearchParams(window.location.search);
-  console.log('URL search:', window.location.search);
-  const initData = urlParams.get('initData');
-  if (initData) {
-    console.log('Found in search as initData');
-    return initData;
-  }
-  
-  console.log('=== INITDATA NOT FOUND ANYWHERE ===');
+  // 1) из Telegram.WebApp
+  if (window.Telegram?.WebApp?.initData) return Telegram.WebApp.initData;
+
+  // 2) из hash (#tgWebAppData=...)
+  try {
+    const hash = window.location.hash.slice(1);
+    const p = new URLSearchParams(hash);
+    const h = p.get('tgWebAppData');
+    if (h) return h;
+  } catch {}
+
+  // 3) из query (?initData=...)
+  try {
+    const q = new URLSearchParams(location.search);
+    const s = q.get('initData');
+    if (s) return s;
+  } catch {}
+
   return '';
 }
 
@@ -2406,62 +2401,64 @@ function hasInitData() {
 
 function queueTgSync(reason) {
   const initData = getInitDataFromAnywhere();
-  console.log('[SYNC] Queueing sync, reason:', reason, 'initData length:', initData.length);
-  
-  if (!initData) {
-    console.warn('[SYNC] skipped: no initData');
-    return;
-  }
-  
-  // Дебаунс - отменяем предыдущий таймер, ставим новый
+
+  // дебаунс (мягкая задержка, чтобы не слать пачками)
   if (tgSyncTimer) clearTimeout(tgSyncTimer);
   tgSyncTimer = setTimeout(() => {
-    sendTgSnapshot(reason);
+    doSync(reason, initData);
     tgSyncTimer = null;
-  }, 300); // 300ms дебаунс вместо 500+немедленной отправки
+  }, 300);
 }
 
-async function sendTgSnapshot(reason) {
-  // Явная проверка вместо try/catch
-  if (!window.Telegram?.WebApp?.initData) {
-    console.warn('[SYNC] No Telegram WebApp initData');
+async function doSync(reason, initData) {
+  // 1) Если есть initData — шлём на HTTPS /sync (не сворачивает WebView)
+  if (initData) {
+    try {
+      const snapshot = buildExportPayload(true);
+      const res = await fetch('https://myvakhta.duckdns.org/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initData,
+          snapshot,
+          reason: reason || 'auto',
+          timestamp: new Date().toISOString()
+        })
+      });
+      if (!res.ok) {
+        console.warn('[SYNC] HTTP error:', res.status);
+        if (queryFlag('debug')) showToast('Ошибка синхронизации: ' + res.status, 2000);
+      } else {
+        if (queryFlag('debug')) showToast('✓ Синхронизировано', 1000);
+      }
+      return;
+    } catch (e) {
+      console.warn('[SYNC] fetch error:', e);
+      if (queryFlag('debug')) showToast('Ошибка сети', 2000);
+      return;
+    }
+  }
+
+  // 2) initData нет → по умолчанию ничего не делаем (чтобы WebApp не сворачивался)
+  //    Если очень нужно — включаем fallback sendData параметром ?sdfallback=1
+  if (!sendDataFallbackEnabled()) {
+    console.warn('[SYNC] skipped: no initData (fallback off)');
     return;
   }
-  
+
+  // 3) Fallback: отправить короткий пакет через sendData (может свернуть WebView в некоторых клиентах)
   try {
-    const initData = Telegram.WebApp.initData;
-    const snapshot = buildExportPayload(true);
-    console.log('[SYNC] Sending snapshot, reason:', reason);
-    
-    const res = await fetch('https://myvakhta.duckdns.org/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        initData, 
-        snapshot, 
-        reason: reason || 'auto',
-        timestamp: new Date().toISOString()
-      })
-    });
-    
-    if (!res.ok) {
-      console.warn('[SYNC] HTTP error:', res.status);
-      if (queryFlag('debug')) {
-        showToast('Ошибка синхронизации: ' + res.status, 2000);
-      }
-    } else {
-      console.log('[SYNC] Success');
-      if (queryFlag('debug')) {
-        showToast('✓ Синхронизировано', 1000);
-      }
+    if (window.Telegram?.WebApp?.sendData) {
+      const code = buildExportCode(false); // короткий (basic)
+      const envelope = { kind: 'snapshot-basic', code, reason: reason || 'auto-fallback' };
+      Telegram.WebApp.sendData(JSON.stringify(envelope));
+      if (queryFlag('debug')) showToast('↪ fallback sendData', 1200);
     }
   } catch (e) {
-    console.warn('[SYNC] fetch error:', e);
-    if (queryFlag('debug')) {
-      showToast('Ошибка сети', 2000);
-    }
+    console.warn('[SYNC] sendData fallback error:', e);
   }
 }
+
 
 // Панель действий (гарантия наличия)
 function ensureActionsBar() {
@@ -2509,7 +2506,7 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
-function addTgTestButton() {
+function addTgTestButton() { /* no-op */ }
   // Показываем тест-кнопку ТОЛЬКО в WebApp
   if (!hasInitData()) return;
   
@@ -2566,6 +2563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
