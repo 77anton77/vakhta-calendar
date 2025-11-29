@@ -2507,30 +2507,7 @@ function queryFlag(name, def = false) {
 // Одна умная кнопка синхронизации (двойная отправка: sendData + опциональный deep-link)
 /// Одна умная кнопка синхронизации (короткий sendData + резервный deep-link через openTelegramLink)
 function addTgTestButton() { /* no-op */ }
-  // Показываем тест-кнопку ТОЛЬКО в WebApp
-  if (!hasInitData()) return;
-  
-  const actions = ensureActionsBar();
-  if (!actions) return;
-  
-  const btn = document.createElement('button');
-  btn.textContent = '🔄 Синхронизировать (тест)';
-  btn.style.cssText = 'padding:6px 10px; background:#17a2b8; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-  btn.onclick = () => {
-  if (window.Telegram?.WebApp?.sendData) {
-    Telegram.WebApp.sendData(JSON.stringify({
-      kind: 'test-manual',
-      message: 'Тестовая синхронизация',
-      timestamp: new Date().toISOString()
-    }));
-    console.log('Тестовая синхронизация отправлена');
-    alert('sendData вызван! Проверь логи webhook.');
-  } else {
-    alert('Telegram.WebApp не доступен');
-  }
-};
-  actions.appendChild(btn);
-}
+
 
 
 // Маленький отладочный бейдж внизу
@@ -2563,6 +2540,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
