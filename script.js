@@ -352,6 +352,7 @@ function initCalendar() {
   ensureActionsBar();
   addTgTestButton();
   addDebugSyncButton(); // видно только при ?debug=1
+  addProbeButton();
   processPrintParams();
   showDebugBanner();
   // Показываем статус синхронизации
@@ -2430,39 +2431,44 @@ async function doSync(reason, initData) {
           timestamp: new Date().toISOString()
         })
       });
+
       if (!res.ok) {
         dbg('HTTP ' + res.status);
+        showToast('sync ' + res.status, 1500);   // NEW: видимый тост со статусом ошибки
         console.warn('[SYNC] HTTP error:', res.status);
       } else {
         dbg('OK');
+        showToast('sync 200', 1000);             // NEW: видимый тост об успехе
       }
       return;
     } catch (e) {
       dbg('ERR fetch');
+      showToast('sync ERR', 1500);               // NEW: видимый тост при сетевой ошибке
       console.warn('[SYNC] fetch error:', e);
       return;
     }
   }
 
   // 2) initData нет → по умолчанию ничего не делаем (чтобы WebApp не сворачивался)
-  //    Если очень нужно — включаем fallback sendData параметром ?sdfallback=1
   if (!sendDataFallbackEnabled()) {
     console.warn('[SYNC] skipped: no initData (fallback off)');
     return;
   }
 
-  // 3) Fallback: отправить короткий пакет через sendData (может свернуть WebView в некоторых клиентах)
+  // 3) Fallback: отправить короткий пакет через sendData (может свернуть WebView)
   try {
     if (window.Telegram?.WebApp?.sendData) {
       const code = buildExportCode(false); // короткий (basic)
       const envelope = { kind: 'snapshot-basic', code, reason: reason || 'auto-fallback' };
       Telegram.WebApp.sendData(JSON.stringify(envelope));
       dbg('↪ fallback sendData');
+      showToast('fallback sendData', 1200);      // NEW: подсказка, что сработал фоллбэк
     }
   } catch (e) {
     console.warn('[SYNC] sendData fallback error:', e);
   }
 }
+
 
 
 
@@ -2492,6 +2498,28 @@ function addDebugSyncButton() {
   btn.onclick = () => queueTgSync('manual-debug');
   actions.appendChild(btn);
 }
+function addProbeButton() {
+  const actions = ensureActionsBar();
+  if (!actions) return;
+  const btn = document.createElement('button');
+  btn.textContent = '🛰 Пинг /sync';
+  btn.style.cssText = 'padding:6px 10px; background:#0984e3; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
+  btn.onclick = async () => {
+    try {
+      const res = await fetch('https://myvakhta.duckdns.org/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ probe: true, ts: new Date().toISOString() })
+      });
+      showToast('probe ' + res.status, 1500);
+    } catch (e) {
+      showToast('probe ERR', 1500);
+      console.warn('probe error', e);
+    }
+  };
+  actions.appendChild(btn);
+}
+
 
 
 // показать короткое уведомление (тост)
@@ -2564,6 +2592,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
