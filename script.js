@@ -2484,15 +2484,15 @@ function ensureActionsBar() {
   return actions;
 }
 function addDebugSyncButton() {
-  if (!queryFlag('debug', false)) return;
   const actions = ensureActionsBar();
   if (!actions) return;
   const btn = document.createElement('button');
-  btn.textContent = '⏫ Отправить снимок (debug)';
+  btn.textContent = '⏫ Отправить снимок';
   btn.style.cssText = 'padding:6px 10px; background:#6c5ce7; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
   btn.onclick = () => queueTgSync('manual-debug');
   actions.appendChild(btn);
 }
+
 
 // показать короткое уведомление (тост)
 function showToast(msg, ms = 1800) {
@@ -2564,6 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
