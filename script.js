@@ -2501,24 +2501,42 @@ function addDebugSyncButton() {
 function addProbeButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
-  const btn = document.createElement('button');
-  btn.textContent = '🛰 Пинг /sync';
-  btn.style.cssText = 'padding:6px 10px; background:#0984e3; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-  btn.onclick = async () => {
+
+  // GET ping (через Image) — всегда логируется как GET /sync 405
+  const btnGet = document.createElement('button');
+  btnGet.textContent = '🛰 GET /sync';
+  btnGet.style.cssText = 'padding:6px 10px; background:#2d3436; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; margin-right:6px;';
+  btnGet.onclick = () => {
     try {
-      const res = await fetch('https://myvakhta.duckdns.org/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ probe: true, ts: new Date().toISOString() })
-      });
-      showToast('probe ' + res.status, 1500);
+      const img = new Image();
+      img.onload = img.onerror = () => showToast('get sent', 1000);
+      img.src = 'https://myvakhta.duckdns.org/sync?ping=' + Date.now();
     } catch (e) {
-      showToast('probe ERR', 1500);
-      console.warn('probe error', e);
+      showToast('get ERR', 1200);
     }
   };
-  actions.appendChild(btn);
+  actions.appendChild(btnGet);
+
+  // POST без preflight (no-cors + text/plain) — логируется как POST /sync 403
+  const btnPost = document.createElement('button');
+  btnPost.textContent = '📡 POST /sync (no-cors)';
+  btnPost.style.cssText = 'padding:6px 10px; background:#0984e3; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
+  btnPost.onclick = async () => {
+    try {
+      await fetch('https://myvakhta.duckdns.org/sync', {
+        method: 'POST',
+        mode: 'no-cors',                        // без CORS-предзапроса
+        headers: { 'Content-Type': 'text/plain' }, // text/plain не триггерит preflight
+        body: 'probe=' + Date.now()
+      });
+      showToast('post sent', 1000);
+    } catch (e) {
+      showToast('post ERR', 1200);
+    }
+  };
+  actions.appendChild(btnPost);
 }
+
 
 
 
@@ -2592,6 +2610,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
