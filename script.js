@@ -2419,55 +2419,60 @@ async function doSync(reason, initData) {
   // 1) Если есть initData — шлём на HTTPS /sync (не сворачивает WebView)
   if (initData) {
     try {
-      dbg('POST /sync…');
+      const tag = mkTag('S'); // метка для этого sync-вызова
+      dbg('POST /sync… ' + tag);
+
       const snapshot = buildExportPayload(true);
-      const res = await fetch('https://myvakhta.duckdns.org/sync', {
+      const res = await fetch('https://myvakhta.duckdns.org/sync?r=' + encodeURIComponent(tag), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           initData,
           snapshot,
           reason: reason || 'auto',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          tag
         })
       });
 
+      showToast('sync sent ' + tag, 1000);      // сразу подсказка с меткой
       if (!res.ok) {
         dbg('HTTP ' + res.status);
-        showToast('sync ' + res.status, 1500);   // NEW: видимый тост со статусом ошибки
+        showToast('sync ' + res.status, 1500);
         console.warn('[SYNC] HTTP error:', res.status);
       } else {
         dbg('OK');
-        showToast('sync 200', 1000);             // NEW: видимый тост об успехе
+        showToast('sync 200', 1000);
       }
       return;
     } catch (e) {
       dbg('ERR fetch');
-      showToast('sync ERR', 1500);               // NEW: видимый тост при сетевой ошибке
+      showToast('sync ERR', 1500);
       console.warn('[SYNC] fetch error:', e);
       return;
     }
   }
 
-  // 2) initData нет → по умолчанию ничего не делаем (чтобы WebApp не сворачивался)
+  // 2) initData нет → ничего не шлём (чтобы WebView не сворачивался)
   if (!sendDataFallbackEnabled()) {
     console.warn('[SYNC] skipped: no initData (fallback off)');
     return;
   }
 
-  // 3) Fallback: отправить короткий пакет через sendData (может свернуть WebView)
+  // 3) Fallback: через sendData (может свернуть WebView)
   try {
     if (window.Telegram?.WebApp?.sendData) {
       const code = buildExportCode(false); // короткий (basic)
       const envelope = { kind: 'snapshot-basic', code, reason: reason || 'auto-fallback' };
       Telegram.WebApp.sendData(JSON.stringify(envelope));
       dbg('↪ fallback sendData');
-      showToast('fallback sendData', 1200);      // NEW: подсказка, что сработал фоллбэк
+      showToast('fallback sendData', 1200);
     }
   } catch (e) {
     console.warn('[SYNC] sendData fallback error:', e);
   }
 }
+
 
 
 
@@ -2502,40 +2507,39 @@ function addProbeButton() {
   const actions = ensureActionsBar();
   if (!actions) return;
 
-  // GET ping (через Image) — всегда логируется как GET /sync 405
+  // GET ping с тегом → в логе будет /sync?ping=G-...
   const btnGet = document.createElement('button');
   btnGet.textContent = '🛰 GET /sync';
   btnGet.style.cssText = 'padding:6px 10px; background:#2d3436; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; margin-right:6px;';
   btnGet.onclick = () => {
     try {
+      const tag = mkTag('G');
       const img = new Image();
-      img.onload = img.onerror = () => showToast('get sent', 1000);
-      img.src = 'https://myvakhta.duckdns.org/sync?ping=' + Date.now();
-    } catch (e) {
-      showToast('get ERR', 1200);
-    }
+      img.onload = img.onerror = () => showToast('GET ' + tag, 1200);
+      img.src = 'https://myvakhta.duckdns.org/sync?ping=' + encodeURIComponent(tag);
+    } catch (e) { showToast('get ERR', 1200); }
   };
   actions.appendChild(btnGet);
 
-  // POST без preflight (no-cors + text/plain) — логируется как POST /sync 403
+  // POST no-cors с тегом → в логе будет /sync?probe=P-...
   const btnPost = document.createElement('button');
   btnPost.textContent = '📡 POST /sync (no-cors)';
   btnPost.style.cssText = 'padding:6px 10px; background:#0984e3; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
   btnPost.onclick = async () => {
     try {
-      await fetch('https://myvakhta.duckdns.org/sync', {
+      const tag = mkTag('P');
+      await fetch('https://myvakhta.duckdns.org/sync?probe=' + encodeURIComponent(tag), {
         method: 'POST',
-        mode: 'no-cors',                        // без CORS-предзапроса
-        headers: { 'Content-Type': 'text/plain' }, // text/plain не триггерит preflight
-        body: 'probe=' + Date.now()
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'probe=' + tag
       });
-      showToast('post sent', 1000);
-    } catch (e) {
-      showToast('post ERR', 1200);
-    }
+      showToast('POST ' + tag, 1200);
+    } catch (e) { showToast('post ERR', 1200); }
   };
   actions.appendChild(btnPost);
 }
+
 
 
 
@@ -2563,6 +2567,9 @@ function queryFlag(name, def = false) {
     if (v == null) return def;
     return /^(1|true|yes)$/i.test(v);
   } catch { return def; }
+}
+function mkTag(prefix) {
+  return String(prefix || 'X') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
 }
 
 function dbg(msg) {
@@ -2610,6 +2617,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
