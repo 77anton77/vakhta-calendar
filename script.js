@@ -2494,51 +2494,8 @@ function ensureActionsBar() {
   }
   return actions;
 }
-function addDebugSyncButton() {
-  const actions = ensureActionsBar();
-  if (!actions) return;
-  const btn = document.createElement('button');
-  btn.textContent = '⏫ Отправить снимок';
-  btn.style.cssText = 'padding:6px 10px; background:#6c5ce7; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-  btn.onclick = () => queueTgSync('manual-debug');
-  actions.appendChild(btn);
-}
-function addProbeButton() {
-  const actions = ensureActionsBar();
-  if (!actions) return;
-
-  // GET ping с тегом → в логе будет /sync?ping=G-...
-  const btnGet = document.createElement('button');
-  btnGet.textContent = '🛰 GET /sync';
-  btnGet.style.cssText = 'padding:6px 10px; background:#2d3436; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px; margin-right:6px;';
-  btnGet.onclick = () => {
-    try {
-      const tag = mkTag('G');
-      const img = new Image();
-      img.onload = img.onerror = () => showToast('GET ' + tag, 1200);
-      img.src = 'https://myvakhta.duckdns.org/sync?ping=' + encodeURIComponent(tag);
-    } catch (e) { showToast('get ERR', 1200); }
-  };
-  actions.appendChild(btnGet);
-
-  // POST no-cors с тегом → в логе будет /sync?probe=P-...
-  const btnPost = document.createElement('button');
-  btnPost.textContent = '📡 POST /sync (no-cors)';
-  btnPost.style.cssText = 'padding:6px 10px; background:#0984e3; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:12px;';
-  btnPost.onclick = async () => {
-    try {
-      const tag = mkTag('P');
-      await fetch('https://myvakhta.duckdns.org/sync?probe=' + encodeURIComponent(tag), {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: 'probe=' + tag
-      });
-      showToast('POST ' + tag, 1200);
-    } catch (e) { showToast('post ERR', 1200); }
-  };
-  actions.appendChild(btnPost);
-}
+function addDebugSyncButton() { /* hidden in prod */ }
+function addProbeButton() { /* hidden in prod */ }
 
 
 
@@ -2617,6 +2574,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
