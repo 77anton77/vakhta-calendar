@@ -355,7 +355,8 @@ function initCalendar() {
   addProbeButton();
   processPrintParams();
   showDebugBanner();
-  // Показываем статус синхронизации
+  maybeOnboardOnce();
+// Показываем статус синхронизации
   setTimeout(() => {
     const status = document.createElement('div');
     status.style.cssText = 'position:fixed; top:10px; right:10px; background:#000; color:#fff; padding:5px; z-index:1000; font-size:12px;';
@@ -407,7 +408,15 @@ function initTelegramApp() {
     console.warn('[TG] initTelegramApp error:', e);
   }
 }
-
+function maybeOnboardOnce() {
+  try {
+    if (!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData)) return;
+    if (!(window.Telegram && Telegram.WebApp && Telegram.WebApp.sendData)) return;
+    if (localStorage.getItem('tg_onboarded') === '1') return;
+    Telegram.WebApp.sendData('onboarding'); // бот поймает и пришлёт клавиатуру
+    localStorage.setItem('tg_onboarded', '1');
+  } catch {}
+}
 function setupEventListeners() {
   // Блокируем системное меню "копировать"
   document.addEventListener('contextmenu', (e) => {
@@ -2574,6 +2583,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Ошибка запуска: ' + (e && e.message ? e.message : e));
   }
 });
+
 
 
 
